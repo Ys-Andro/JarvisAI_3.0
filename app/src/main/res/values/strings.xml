@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">JarvisAI</string>
+    <string name="accessibility_service_description">JarvisAI Accessibility Service para control total del dispositivo, lectura de pantalla y ejecución de comandos globales.</string>
+</resources>

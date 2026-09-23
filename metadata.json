@@ -1,0 +1,8 @@
+{
+  "name": "Remix JarvisAi",
+  "description": "Aplicación Android offline para chatear con modelos de lenguaje GGUF usando llama.cpp con TTS y biblioteca local.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
