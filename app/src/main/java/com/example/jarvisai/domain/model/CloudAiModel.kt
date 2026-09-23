@@ -75,9 +75,30 @@ data class CloudAiModel(
             CloudAiModel(
                 id = "llama-3.3-70b-versatile",
                 provider = ModelProvider.GROQ,
-                name = "Llama 3.3 70B (Groq)",
-                description = "Velocidad de respuesta instantánea (>300 t/s)",
+                name = "Llama 3.3 70B (Groq Versatile)",
+                description = "Llama 3.3 optimizada para uso general en Groq",
                 defaultContextLength = 128000
+            ),
+            CloudAiModel(
+                id = "llama-3.3-70b-specdec",
+                provider = ModelProvider.GROQ,
+                name = "Llama 3.3 70B (Groq SpecDec)",
+                description = "Velocidad de respuesta hiper-rápida vía Speculative Decoding",
+                defaultContextLength = 128000
+            ),
+            CloudAiModel(
+                id = "llama-3.1-8b-instant",
+                provider = ModelProvider.GROQ,
+                name = "Llama 3.1 8B (Groq Instant)",
+                description = "Respuesta ultra veloz e instantánea en cualquier nivel",
+                defaultContextLength = 128000
+            ),
+            CloudAiModel(
+                id = "llama3-70b-8192",
+                provider = ModelProvider.GROQ,
+                name = "Llama 3 70B (Groq Legacy)",
+                description = "Modelo Llama 3 estable para todas las cuentas de Groq",
+                defaultContextLength = 8192
             ),
             CloudAiModel(
                 id = "mixtral-8x7b-32768",
