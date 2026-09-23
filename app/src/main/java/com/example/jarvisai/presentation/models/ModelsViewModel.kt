@@ -127,6 +127,11 @@ class ModelsViewModel(
         updateSettings(current.copy(autoTts = enabled))
     }
 
+    fun toggleForceOffline(enabled: Boolean) {
+        val current = _uiState.value.settings
+        updateSettings(current.copy(forceOffline = enabled))
+    }
+
     fun updateTtsSpeed(speed: Float) {
         val current = _uiState.value.settings
         updateSettings(current.copy(ttsSpeed = speed))

@@ -5,7 +5,13 @@ import java.util.regex.Pattern
 
 object OfflineInferenceEngine {
 
-    fun tryLocalOfflineInference(context: Context, prompt: String, isOffline: Boolean): String? {
+    fun tryLocalOfflineInference(
+        context: Context,
+        prompt: String,
+        isOffline: Boolean,
+        documents: List<com.example.jarvisai.domain.model.DocumentItem> = emptyList(),
+        memories: List<com.example.jarvisai.domain.model.MemoryItem> = emptyList()
+    ): String? {
         val query = prompt.lowercase().trim()
 
         // 1. Flashlight / Linterna
@@ -123,6 +129,30 @@ object OfflineInferenceEngine {
         }
         if (query.contains("sube") || query.contains("desplaza arriba") || query.contains("scroll arriba")) {
             return "Desplazando pantalla arriba localmente.\n\n[JARVIS_ACTION: {\"action\":\"SCROLL_UP\"}]"
+        }
+
+        // 12. Local Search in Documents & Memories (Pillar 3: Offline Local Querying)
+        if (query.contains("documento") || query.contains("archivo") || query.contains("pdf") || query.contains("txt") || query.contains("recuerdas") || query.contains("memoria") || query.contains("guardado")) {
+            // Check in memories
+            val matchedMemory = memories.find { query.contains(it.key.lowercase()) || query.contains(it.value.lowercase()) || it.value.lowercase().split(" ").any { word -> word.length > 4 && query.contains(word) } }
+            if (matchedMemory != null) {
+                return "Analizando mis archivos de memoria a largo plazo locales, señor. He recuperado el siguiente dato guardado:\n\n\"${matchedMemory.key}: ${matchedMemory.value}\"\n\n¿Hay algo más que requiera de mis bancos de memoria local?"
+            }
+
+            // Check in documents
+            val matchedDoc = documents.find { query.contains(it.title.lowercase()) || it.content.lowercase().split(" ").any { word -> word.length > 5 && query.contains(word) } }
+            if (matchedDoc != null) {
+                val excerpt = if (matchedDoc.content.length > 300) matchedDoc.content.take(300) + "..." else matchedDoc.content
+                return "Accediendo a la base de datos de documentos locales de Room, señor. He localizado el archivo '${matchedDoc.title}':\n\n[Contenido parcial recuperado localmente]:\n$excerpt\n\nAcción local completada exitosamente."
+            }
+
+            if (isOffline) {
+                if (documents.isEmpty() && memories.isEmpty()) {
+                    return "⚠️ Señor, actualmente no tengo registros de documentos ni memorias a largo plazo en la base de datos local de Room para realizar una búsqueda."
+                }
+                val docList = documents.joinToString("\n") { "- ${it.title} (${it.fileType})" }
+                return "Señor, estoy operando fuera de línea. He listado sus documentos de Room disponibles localmente:\n\n$docList\n\nSi desea que lea uno de ellos, indíqueme su nombre exacto."
+            }
         }
 
         // Fallback response ONLY if we are actually offline

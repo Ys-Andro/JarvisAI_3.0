@@ -276,35 +276,48 @@ class AndroidLiveVoiceEngine(
     override fun startListening() {
         if (_sessionState.value.isMuted) return
 
-        mainHandler.post {
+        engineScope.launch {
             try {
-                if (speechRecognizer == null) {
-                    initSpeechRecognizer()
-                }
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                    putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
-                }
-                speechRecognizer?.cancel()
-                speechRecognizer?.startListening(intent)
-                isListeningActive = true
-                _sessionState.update {
-                    it.copy(
-                        phase = LiveVoicePhase.Listening,
-                        statusLabel = "Escuchando... Habla libremente"
-                    )
+                val settings = settingsRepository.getSettings().first()
+                val isOffline = !com.example.jarvisai.data.util.NetworkMonitor(context).isCurrentlyOnline || settings.forceOffline
+
+                mainHandler.post {
+                    try {
+                        if (speechRecognizer == null) {
+                            initSpeechRecognizer()
+                        }
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+                            if (isOffline) {
+                                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                                putExtra("android.speech.extra.DICTATION_MODE", true)
+                            }
+                        }
+                        speechRecognizer?.cancel()
+                        speechRecognizer?.startListening(intent)
+                        isListeningActive = true
+                        _sessionState.update {
+                            it.copy(
+                                phase = LiveVoicePhase.Listening,
+                                statusLabel = if (isOffline) "Escuchando localmente (Offline)..." else "Escuchando... Habla libremente"
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to start listening: ${e.message}")
+                        isListeningActive = false
+                        _sessionState.update {
+                            it.copy(
+                                phase = LiveVoicePhase.Idle,
+                                statusLabel = "Toca 'HABLAR AHORA' para reintentar"
+                            )
+                        }
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start listening: ${e.message}")
-                isListeningActive = false
-                _sessionState.update {
-                    it.copy(
-                        phase = LiveVoicePhase.Idle,
-                        statusLabel = "Toca 'HABLAR AHORA' para reintentar"
-                    )
-                }
+                Log.e(TAG, "Error in startListening: ${e.message}")
             }
         }
     }

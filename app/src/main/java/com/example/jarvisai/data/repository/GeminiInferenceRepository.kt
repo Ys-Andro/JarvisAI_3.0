@@ -13,6 +13,7 @@ import com.example.jarvisai.domain.model.Message
 import com.example.jarvisai.domain.model.ModelProvider
 import com.example.jarvisai.domain.repository.IInferenceRepository
 import com.example.jarvisai.domain.repository.IMemoryRepository
+import com.example.jarvisai.domain.repository.IDocumentRepository
 import com.example.jarvisai.domain.repository.ISettingsRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,7 @@ class GeminiInferenceRepository(
     private val universalApiClient: UniversalAiApiClient,
     private val settingsRepository: ISettingsRepository,
     private val memoryRepository: IMemoryRepository,
+    private val documentRepository: IDocumentRepository,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : IInferenceRepository {
 
@@ -97,8 +99,16 @@ class GeminiInferenceRepository(
         imageMimeType: String?
     ): Flow<String> = flow {
         // Check for offline/local bypass
-        val isOffline = !networkMonitor.isCurrentlyOnline
-        val localResponse = com.example.jarvisai.data.util.OfflineInferenceEngine.tryLocalOfflineInference(context, prompt, isOffline)
+        val isOffline = !networkMonitor.isCurrentlyOnline || settings.forceOffline
+        val docs = documentRepository.getAllDocuments().first()
+        val mems = memoryRepository.getAllMemories().first()
+        val localResponse = com.example.jarvisai.data.util.OfflineInferenceEngine.tryLocalOfflineInference(
+            context = context,
+            prompt = prompt,
+            isOffline = isOffline,
+            documents = docs,
+            memories = mems
+        )
         if (localResponse != null) {
             _inferenceState.value = InferenceState.Generating(
                 partialText = localResponse,

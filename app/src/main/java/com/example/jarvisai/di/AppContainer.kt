@@ -81,7 +81,7 @@ class AppContainer(private val context: Context) {
     }
 
     val inferenceRepository: IInferenceRepository by lazy {
-        GeminiInferenceRepository(context, geminiApiClient, universalApiClient, settingsRepository, memoryRepository)
+        GeminiInferenceRepository(context, geminiApiClient, universalApiClient, settingsRepository, memoryRepository, documentRepository)
     }
 
     val ttsRepository: ITtsRepository by lazy {

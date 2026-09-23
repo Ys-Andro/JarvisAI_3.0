@@ -10,5 +10,6 @@ data class GenerationSettings(
     val autoTts: Boolean = false,
     val ttsSpeed: Float = 1.0f,
     val ttsPitch: Float = 0.85f,
-    val androidVoiceName: String = ""
+    val androidVoiceName: String = "",
+    val forceOffline: Boolean = false
 )

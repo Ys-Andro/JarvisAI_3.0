@@ -34,11 +34,17 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -103,6 +109,7 @@ fun SettingsScreen(
     var isVoiceExpanded by remember { mutableStateOf(true) }
     var isMemoryExpanded by remember { mutableStateOf(true) }
     var isThemeExpanded by remember { mutableStateOf(false) }
+    var isOfflineModeExpanded by remember { mutableStateOf(true) }
 
     Scaffold(
         modifier = modifier
@@ -142,6 +149,131 @@ fun SettingsScreen(
                             }
                         }
                     )
+                }
+
+                // Section: Offline Mode - 4 Pilares
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.DEVICE_CONTROL) {
+                    item {
+                        SettingsSectionCard(
+                            title = "MODO OFFLINE (4 PILARES)",
+                            subtitle = "Autonomía e inteligencia on-device sin conexión",
+                            icon = Icons.Default.CloudOff,
+                            badgeText = if (uiState.settings.forceOffline) "FORZADO OFF" else "HÍBRIDO",
+                            badgeColor = if (uiState.settings.forceOffline) JarvisAccentRed else JarvisAccentCyan,
+                            isExpanded = isOfflineModeExpanded,
+                            onToggleExpand = { isOfflineModeExpanded = !isOfflineModeExpanded }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = "Este módulo activa los 4 pilares de resiliencia táctica de J.A.R.V.I.S. para procesar lenguaje, voz, comandos físicos de hardware y documentos localmente sin usar internet.",
+                                    color = JarvisTextSecondary,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+
+                                // Switch to force offline
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(JarvisSurfaceVariant)
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Forzar Modo Fuera de Línea",
+                                            color = JarvisTextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Ignora internet y opera 100% on-device",
+                                            color = JarvisTextSecondary,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                    Switch(
+                                        checked = uiState.settings.forceOffline,
+                                        onCheckedChange = { viewModel.toggleForceOffline(it) },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = JarvisAccentCyan,
+                                            checkedTrackColor = JarvisAccentCyan.copy(alpha = 0.4f),
+                                            uncheckedThumbColor = JarvisTextSecondary,
+                                            uncheckedTrackColor = JarvisSurface
+                                        )
+                                    )
+                                }
+
+                                // Status indicator of connection
+                                val isConnected = uiState.settings.forceOffline || !com.example.jarvisai.data.util.NetworkMonitor(LocalContext.current).isCurrentlyOnline
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isConnected) JarvisAccentRed else JarvisAccentGreen)
+                                    )
+                                    Text(
+                                        text = if (isConnected) "Red física desconectada - Sistemas de emergencia activos." else "Red física conectada - Operando en modo Híbrido inteligente.",
+                                        color = if (isConnected) JarvisAccentRed else JarvisTextSecondary,
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+
+                                // Informative telemetry about the 4 pillars
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = JarvisPrimary.copy(alpha = 0.05f)),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisPrimary.copy(alpha = 0.2f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "TELEMETRÍA DE LOS 4 PILARES:",
+                                            color = JarvisAccentCyan,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "• PILAR 1 (Cerebro On-Device): Motor NLP de contingencia activo para análisis de intenciones del hardware.",
+                                            color = JarvisTextPrimary,
+                                            fontSize = 9.5.sp
+                                        )
+                                        Text(
+                                            text = "• PILAR 2 (Voz Offline): Reconocimiento de voz dictada local preferencial activo.",
+                                            color = JarvisTextPrimary,
+                                            fontSize = 9.5.sp
+                                        )
+                                        Text(
+                                            text = "• PILAR 3 (Base SQLite Room): Indexación de bancos de memoria y documentos para consulta rápida local.",
+                                            color = JarvisTextPrimary,
+                                            fontSize = 9.5.sp
+                                        )
+                                        Text(
+                                            text = "• PILAR 4 (Smart Router): Enrutador automático de contingencia activo para fallas de red.",
+                                            color = JarvisTextPrimary,
+                                            fontSize = 9.5.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Section: Device Control & Hardware Automation
