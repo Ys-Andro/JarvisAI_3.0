@@ -54,21 +54,48 @@ object LocalLlmManager {
         _isDownloading.value = true
         _downloadProgress.value = 0f
         
-        val urlString = customUrl ?: DEFAULT_MODEL_URL
+        var urlString = customUrl ?: DEFAULT_MODEL_URL
         val targetFile = getModelFile(context)
         val tempFile = File(context.cacheDir, "$MODEL_FILE_NAME.tmp")
         
         try {
             if (tempFile.exists()) tempFile.delete()
             
-            val url = URL(urlString)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 15000
-            connection.readTimeout = 30000
-            connection.connect()
+            var connection: HttpURLConnection? = null
+            var responseCode = 0
+            var redirectCount = 0
+            val maxRedirects = 6
             
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                Log.e(TAG, "Server returned HTTP ${connection.responseCode}")
+            while (redirectCount < maxRedirects) {
+                val url = URL(urlString)
+                connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 20000
+                connection.readTimeout = 40000
+                connection.instanceFollowRedirects = true
+                connection.connect()
+                
+                responseCode = connection.responseCode
+                Log.d(TAG, "Response Code: $responseCode for URL: $urlString")
+                
+                if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
+                    responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
+                    responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+                    responseCode == 307 || responseCode == 308) {
+                    val newUrl = connection.getHeaderField("Location")
+                    Log.d(TAG, "Redirected to: $newUrl")
+                    connection.disconnect()
+                    if (newUrl != null) {
+                        urlString = newUrl
+                    }
+                    redirectCount++
+                } else {
+                    break
+                }
+            }
+            
+            if (connection == null || responseCode != HttpURLConnection.HTTP_OK) {
+                Log.e(TAG, "Server final response code: $responseCode")
+                connection?.disconnect()
                 _isDownloading.value = false
                 return@withContext false
             }
@@ -77,7 +104,7 @@ object LocalLlmManager {
             val input = BufferedInputStream(connection.getInputStream())
             val output = FileOutputStream(tempFile)
             
-            val data = ByteArray(8192)
+            val data = ByteArray(16384) // Bigger buffer for faster download
             var total: Long = 0
             var count: Int
             
@@ -92,6 +119,7 @@ object LocalLlmManager {
             output.flush()
             output.close()
             input.close()
+            connection.disconnect()
             
             if (targetFile.exists()) targetFile.delete()
             tempFile.renameTo(targetFile)
