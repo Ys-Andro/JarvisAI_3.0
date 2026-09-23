@@ -155,8 +155,16 @@ object OfflineInferenceEngine {
             }
         }
 
-        // Fallback response ONLY if we are actually offline
+        // Fallback or MediaPipe Local LLM Inference
         if (isOffline) {
+            // Check if MediaPipe Local LLM is available and initialized
+            if (LocalLlmManager.isModelLoaded.value) {
+                val localLlmResponse = LocalLlmManager.generateResponse(prompt)
+                if (localLlmResponse != null && localLlmResponse.isNotBlank()) {
+                    return "[🧠 J.A.R.V.I.S. Local LLM]:\n$localLlmResponse"
+                }
+            }
+            
             return "⚠️ Modo Fuera de Línea Activo, Señor. Actualmente no dispongo de conexión a internet para consultar con los modelos en la nube. Sin embargo, mis sistemas lógicos de hardware local están activos para procesar controles físicos (linterna, volumen, batería, alarmas, temporizadores, abrir aplicaciones, llamadas, gestos de pantalla). Intente uno de estos comandos locales."
         }
 

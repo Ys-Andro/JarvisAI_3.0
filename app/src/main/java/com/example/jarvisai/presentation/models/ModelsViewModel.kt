@@ -28,6 +28,13 @@ class ModelsViewModel(
     private val _uiState = MutableStateFlow(ModelsUiState())
     val uiState: StateFlow<ModelsUiState> = _uiState.asStateFlow()
 
+    // Local LLM State Flows
+    val localLlmDownloading = com.example.jarvisai.data.util.LocalLlmManager.isDownloading
+    val localLlmProgress = com.example.jarvisai.data.util.LocalLlmManager.downloadProgress
+    val localLlmDownloaded = com.example.jarvisai.data.util.LocalLlmManager.isModelDownloaded
+    val localLlmInitializing = com.example.jarvisai.data.util.LocalLlmManager.isInitializing
+    val localLlmLoaded = com.example.jarvisai.data.util.LocalLlmManager.isModelLoaded
+
     init {
         observeSettings()
         observeTheme()
@@ -35,6 +42,51 @@ class ModelsViewModel(
         observeGeminiModel()
         observeProviderApiKeys()
         observeSelectedAgent()
+        
+        // Auto-initialize local LLM in background if downloaded
+        viewModelScope.launch {
+            if (com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)) {
+                com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+            }
+        }
+    }
+
+    fun downloadLocalLlm() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(statusMessage = "Iniciando descarga de Llama 3.2 1B (Aprox. 1.2GB), por favor no cierre la app...") }
+            val success = com.example.jarvisai.data.util.LocalLlmManager.downloadModel(context)
+            if (success) {
+                _uiState.update { it.copy(statusMessage = "¡Modelo descargado con éxito! Inicializando motor...") }
+                val initSuccess = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+                if (initSuccess) {
+                    _uiState.update { it.copy(statusMessage = "¡J.A.R.V.I.S. Local LLM activo y listo para operar fuera de línea! 🧠") }
+                } else {
+                    _uiState.update { it.copy(errorMessage = "Modelo descargado, pero falló la inicialización en este hardware.") }
+                }
+            } else {
+                _uiState.update { it.copy(errorMessage = "Error en la descarga del modelo local. Verifique su conexión.") }
+            }
+        }
+    }
+
+    fun deleteLocalLlm() {
+        val deleted = com.example.jarvisai.data.util.LocalLlmManager.deleteModel(context)
+        if (deleted) {
+            _uiState.update { it.copy(statusMessage = "Modelo local eliminado del dispositivo. Almacenamiento liberado.") }
+        } else {
+            _uiState.update { it.copy(statusMessage = "No se encontró ningún archivo de modelo para eliminar.") }
+        }
+    }
+
+    fun initializeLocalLlm() {
+        viewModelScope.launch {
+            val initialized = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+            if (initialized) {
+                _uiState.update { it.copy(statusMessage = "Motor local cargado exitosamente en memoria.") }
+            } else {
+                _uiState.update { it.copy(errorMessage = "No se pudo cargar el modelo local. Asegúrese de haberlo descargado.") }
+            }
+        }
     }
 
     private fun observeSelectedAgent() {

@@ -44,6 +44,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -99,6 +100,13 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    // Local LLM States
+    val localLlmDownloading by viewModel.localLlmDownloading.collectAsState()
+    val localLlmProgress by viewModel.localLlmProgress.collectAsState()
+    val localLlmDownloaded by viewModel.localLlmDownloaded.collectAsState()
+    val localLlmInitializing by viewModel.localLlmInitializing.collectAsState()
+    val localLlmLoaded by viewModel.localLlmLoaded.collectAsState()
 
     var selectedCategory by remember { mutableStateOf(SettingsCategory.ALL) }
 
@@ -269,6 +277,191 @@ fun SettingsScreen(
                                             color = JarvisTextPrimary,
                                             fontSize = 9.5.sp
                                         )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // Local Conversational Brain: MediaPipe + Llama 3.2 1B
+                                Text(
+                                    text = "PILAR 1 AVANZADO: CEREBRO CONVERSACIONAL LOCAL",
+                                    color = JarvisAccentCyan,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = JarvisSurfaceVariant.copy(alpha = 0.5f)),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Llama 3.2 1B (Instruct)",
+                                                color = JarvisTextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+
+                                            // Status Badge
+                                            Surface(
+                                                color = when {
+                                                    localLlmDownloading -> JarvisAccentCyan.copy(alpha = 0.2f)
+                                                    localLlmLoaded -> JarvisAccentGreen.copy(alpha = 0.2f)
+                                                    localLlmDownloaded -> JarvisPrimary.copy(alpha = 0.2f)
+                                                    else -> JarvisTextSecondary.copy(alpha = 0.12f)
+                                                },
+                                                shape = RoundedCornerShape(4.dp),
+                                                border = androidx.compose.foundation.BorderStroke(
+                                                    1.dp,
+                                                    when {
+                                                        localLlmDownloading -> JarvisAccentCyan
+                                                        localLlmLoaded -> JarvisAccentGreen
+                                                        localLlmDownloaded -> JarvisPrimary
+                                                        else -> JarvisTextSecondary.copy(alpha = 0.4f)
+                                                    }
+                                                )
+                                            ) {
+                                                Text(
+                                                    text = when {
+                                                        localLlmDownloading -> "DESCARGANDO"
+                                                        localLlmInitializing -> "INICIALIZANDO"
+                                                        localLlmLoaded -> "ACTIVO EN RAM"
+                                                        localLlmDownloaded -> "DESCARGADO"
+                                                        else -> "NO DISPONIBLE"
+                                                    },
+                                                    color = when {
+                                                        localLlmDownloading -> JarvisAccentCyan
+                                                        localLlmLoaded -> JarvisAccentGreen
+                                                        localLlmDownloaded -> JarvisPrimary
+                                                        else -> JarvisTextSecondary
+                                                    },
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Text(
+                                            text = "Ejecuta un modelo de lenguaje GPT local en la GPU/CPU para razonamiento conversacional complejo sin conexión.",
+                                            color = JarvisTextSecondary,
+                                            fontSize = 10.sp
+                                        )
+
+                                        if (localLlmDownloading) {
+                                            Column(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                LinearProgressIndicator(
+                                                    progress = { localLlmProgress },
+                                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                                                    color = JarvisAccentCyan,
+                                                    trackColor = JarvisSurface
+                                                )
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        text = "Descargando modelo cuantizado...",
+                                                        color = JarvisTextSecondary,
+                                                        fontSize = 9.sp
+                                                    )
+                                                    Text(
+                                                        text = "${(localLlmProgress * 100).toInt()}%",
+                                                        color = JarvisAccentCyan,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                if (!localLlmDownloaded) {
+                                                    Surface(
+                                                        onClick = { viewModel.downloadLocalLlm() },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = JarvisAccentCyan.copy(alpha = 0.12f),
+                                                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentCyan),
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier.padding(vertical = 10.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "DESCARGAR MODELO LOCAL (~1.2 GB)",
+                                                                color = JarvisAccentCyan,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        }
+                                                    }
+                                                } else {
+                                                    // Downloaded, show Initialize & Delete buttons
+                                                    if (!localLlmLoaded) {
+                                                        Surface(
+                                                            onClick = { viewModel.initializeLocalLlm() },
+                                                            shape = RoundedCornerShape(8.dp),
+                                                            color = JarvisAccentGreen.copy(alpha = 0.12f),
+                                                            border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentGreen),
+                                                            modifier = Modifier.weight(1f)
+                                                        ) {
+                                                            Box(
+                                                                modifier = Modifier.padding(vertical = 10.dp),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Text(
+                                                                    text = "CARGAR EN RAM",
+                                                                    color = JarvisAccentGreen,
+                                                                    fontSize = 10.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    fontFamily = FontFamily.Monospace
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    Surface(
+                                                        onClick = { viewModel.deleteLocalLlm() },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = JarvisAccentRed.copy(alpha = 0.12f),
+                                                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentRed),
+                                                        modifier = Modifier.weight(if (!localLlmLoaded) 0.6f else 1f)
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier.padding(vertical = 10.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "ELIMINAR MODELO",
+                                                                color = JarvisAccentRed,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
