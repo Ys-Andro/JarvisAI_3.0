@@ -9,7 +9,7 @@ enum class ModelProvider(
     OPENROUTER("openrouter", "OpenRouter", "https://openrouter.ai/api/v1"),
     OPENAI("openai", "OpenAI / ChatGPT", "https://api.openai.com/v1"),
     DEEPSEEK("deepseek", "DeepSeek", "https://api.deepseek.com/v1"),
-    GROQ("groq", "Groq (Llama / Mixtral)", "https://api.groq.com/openai/v1"),
+    GROQ("groq", "Groq (GPT-OSS / Qwen)", "https://api.groq.com/openai/v1"),
     ANTHROPIC("anthropic", "Anthropic Claude", "https://api.anthropic.com/v1"),
     CUSTOM_OPENAI("custom", "OpenAI Compatible (Ollama / LocalAI / LMStudio)", "")
 }
@@ -71,41 +71,34 @@ data class CloudAiModel(
                 defaultContextLength = 64000
             ),
 
-            // Groq Fast Inference
+            // Groq - current production/preview models
             CloudAiModel(
-                id = "llama-3.3-70b-versatile",
+                id = "openai/gpt-oss-120b",
                 provider = ModelProvider.GROQ,
-                name = "Llama 3.3 70B (Groq Versatile)",
-                description = "Llama 3.3 optimizada para uso general en Groq",
-                defaultContextLength = 128000
+                name = "GPT-OSS 120B (Groq)",
+                description = "Modelo de propósito general con razonamiento, tool use y alta capacidad",
+                defaultContextLength = 131072
             ),
             CloudAiModel(
-                id = "llama-3.3-70b-specdec",
+                id = "openai/gpt-oss-20b",
                 provider = ModelProvider.GROQ,
-                name = "Llama 3.3 70B (Groq SpecDec)",
-                description = "Velocidad de respuesta hiper-rápida vía Speculative Decoding",
-                defaultContextLength = 128000
+                name = "GPT-OSS 20B (Groq)",
+                description = "Modelo rápido y eficiente para conversación y tareas generales",
+                defaultContextLength = 131072
             ),
             CloudAiModel(
-                id = "llama-3.1-8b-instant",
+                id = "qwen/qwen3.8-27b",
                 provider = ModelProvider.GROQ,
-                name = "Llama 3.1 8B (Groq Instant)",
-                description = "Respuesta ultra veloz e instantánea en cualquier nivel",
-                defaultContextLength = 128000
+                name = "Qwen 3.8 27B (Groq)",
+                description = "Modelo multimodal con modos thinking/instruct, tool use y JSON",
+                defaultContextLength = 131072
             ),
             CloudAiModel(
-                id = "llama3-70b-8192",
+                id = "openai/gpt-oss-safeguard-20b",
                 provider = ModelProvider.GROQ,
-                name = "Llama 3 70B (Groq Legacy)",
-                description = "Modelo Llama 3 estable para todas las cuentas de Groq",
-                defaultContextLength = 8192
-            ),
-            CloudAiModel(
-                id = "mixtral-8x7b-32768",
-                provider = ModelProvider.GROQ,
-                name = "Mixtral 8x7B (Groq)",
-                description = "MoE rápido y eficiente vía Groq",
-                defaultContextLength = 32768
+                name = "GPT-OSS Safeguard 20B (Groq)",
+                description = "Modelo especializado en seguridad y moderación",
+                defaultContextLength = 131072
             ),
 
             // Claude
