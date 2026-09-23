@@ -70,6 +70,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jarvisai.data.util.DeviceController
@@ -134,7 +135,6 @@ fun FloatingBubbleOrb(
                 )
             )
             .border(2.dp, JarvisPrimary.copy(alpha = 0.8f), CircleShape)
-            .clickable(onClick = onClick)
             .testTag("floating_bubble_orb"),
         contentAlignment = Alignment.Center
     ) {
@@ -336,6 +336,7 @@ fun FloatingOverlayHud(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -365,7 +366,9 @@ fun FloatingOverlayHud(
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.2.sp
+                            letterSpacing = 1.2.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = statusText.uppercase(),
@@ -373,16 +376,19 @@ fun FloatingOverlayHud(
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
                             fontFamily = FontFamily.Monospace,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Open full app
+                    // Open full app (Expand)
                     IconButton(
                         onClick = onOpenFullApp,
                         modifier = Modifier
@@ -410,22 +416,6 @@ fun FloatingOverlayHud(
                             imageVector = Icons.Default.Remove,
                             contentDescription = "Minimizar",
                             tint = JarvisTextSecondary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-
-                    // Close service
-                    IconButton(
-                        onClick = onCloseService,
-                        modifier = Modifier
-                            .size(30.dp)
-                            .background(JarvisSurface, CircleShape)
-                            .border(1.dp, JarvisAccentRed.copy(alpha = 0.3f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Cerrar Burbuja",
-                            tint = JarvisAccentRed,
                             modifier = Modifier.size(14.dp)
                         )
                     }

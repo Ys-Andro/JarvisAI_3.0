@@ -231,7 +231,13 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
             var touchStartTime = 0L
 
             setOnTouchListener { view, event ->
-                if (isExpanded) return@setOnTouchListener false
+                if (isExpanded) {
+                    if (event.action == MotionEvent.ACTION_OUTSIDE) {
+                        setExpandedState(false)
+                        return@setOnTouchListener true
+                    }
+                    return@setOnTouchListener false
+                }
 
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
