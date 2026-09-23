@@ -31,6 +31,8 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.example.MainActivity
 import com.example.jarvisai.di.AppContainer
+import com.example.jarvisai.domain.model.Role
+import com.example.jarvisai.domain.model.Message
 import com.example.jarvisai.domain.voice.LiveVoicePhase
 import com.example.jarvisai.presentation.overlay.FloatingBubbleOrb
 import com.example.jarvisai.presentation.overlay.FloatingOverlayHud
@@ -99,6 +101,43 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
     private var lastPrompt by mutableStateOf("")
     private var lastResponse by mutableStateOf("")
     private var statusText by mutableStateOf("En espera")
+
+    // Database sync
+    private var bubbleConversationId: String? = null
+
+    private suspend fun getOrCreateBubbleConversationId(): String {
+        bubbleConversationId?.let { return it }
+        val repo = appContainer.conversationRepository
+        val allConv = repo.getAllConversations().first()
+        val found = allConv.find { it.title == "Burbuja de J.A.R.V.I.S." }
+        if (found != null) {
+            bubbleConversationId = found.id
+            return found.id
+        }
+        val model = appContainer.settingsRepository.getSelectedGeminiModel().first()
+        val newId = repo.createConversation("Burbuja de J.A.R.V.I.S.", model)
+        bubbleConversationId = newId
+        return newId
+    }
+
+    private fun saveMessageToDatabase(role: Role, content: String) {
+        if (content.isBlank()) return
+        serviceScope.launch {
+            try {
+                val convId = getOrCreateBubbleConversationId()
+                val message = Message(
+                    id = UUID.randomUUID().toString(),
+                    conversationId = convId,
+                    role = role,
+                    content = content,
+                    timestamp = System.currentTimeMillis()
+                )
+                appContainer.conversationRepository.insertMessage(message)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -326,6 +365,7 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
     private fun observeVoiceAndTts() {
         // Set response provider callback for live voice
         appContainer.liveVoiceEngine.setResponseProvider { userQuery ->
+            saveMessageToDatabase(Role.USER, userQuery)
             lastPrompt = userQuery
             isThinking = true
             statusText = "Generando respuesta con IA..."
@@ -342,6 +382,7 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
                     lastResponse = fullResponse.toString()
                 }
                 isThinking = false
+                saveMessageToDatabase(Role.ASSISTANT, fullResponse.toString())
                 fullResponse.toString()
             } catch (e: Exception) {
                 isThinking = false
@@ -408,6 +449,7 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
     }
 
     private fun executePrompt(prompt: String) {
+        saveMessageToDatabase(Role.USER, prompt)
         lastPrompt = prompt
         isThinking = true
         statusText = "Consultando Jarvis..."
@@ -429,6 +471,7 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
 
                 isThinking = false
                 statusText = "Respuesta lista"
+                saveMessageToDatabase(Role.ASSISTANT, fullResponse.toString())
 
                 // Auto speak response if enabled
                 if (settings.autoTts) {

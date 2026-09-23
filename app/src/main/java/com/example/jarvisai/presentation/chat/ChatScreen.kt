@@ -575,56 +575,113 @@ private fun ChatTopBar(
                     }
                 }
 
-                // Share / Export Conversation
-                Surface(
-                    onClick = onShareClick,
-                    shape = CircleShape,
-                    color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Compartir conversación",
-                            tint = JarvisTextSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
+                // Holographic Diagnostics & System Overflow Menu
+                var isMenuExpanded by remember { mutableStateOf(false) }
 
-                // History / Biblioteca Sessions
-                Surface(
-                    onClick = onHistoryClick,
-                    shape = CircleShape,
-                    color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.FolderOpen,
-                            contentDescription = "Historial de conversaciones",
-                            tint = JarvisTextSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
+                Box {
+                    Surface(
+                        onClick = { isMenuExpanded = true },
+                        shape = CircleShape,
+                        color = JarvisSurface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorderGlow),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Sistema y Ajustes",
+                                tint = JarvisPrimary,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
                     }
-                }
 
-                // Settings & API Keys Core
-                Surface(
-                    onClick = onModelsClick,
-                    shape = CircleShape,
-                    color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorderGlow),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Configuración y API Keys",
-                            tint = JarvisPrimary,
-                            modifier = Modifier.size(17.dp)
+                    DropdownMenu(
+                        expanded = isMenuExpanded,
+                        onDismissRequest = { isMenuExpanded = false },
+                        modifier = Modifier
+                            .background(JarvisSurfaceElevated)
+                            .border(1.dp, JarvisBorder, RoundedCornerShape(12.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FolderOpen,
+                                        contentDescription = null,
+                                        tint = JarvisTextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "HISTORIAL",
+                                        color = JarvisTextPrimary,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onHistoryClick()
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = null,
+                                        tint = JarvisTextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "EXPORTAR CHAT",
+                                        color = JarvisTextPrimary,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onShareClick()
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = null,
+                                        tint = JarvisPrimary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "MODELOS / API KEYS",
+                                        color = JarvisPrimary,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onModelsClick()
+                            }
                         )
                     }
                 }
