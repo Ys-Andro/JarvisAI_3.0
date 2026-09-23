@@ -47,4 +47,11 @@ class NetworkMonitor(context: Context) {
             connectivityManager.unregisterNetworkCallback(callback)
         }
     }.distinctUntilChanged()
+
+    val isCurrentlyOnline: Boolean
+        get() {
+            val activeNetwork = connectivityManager.activeNetwork
+            val caps = activeNetwork?.let { connectivityManager.getNetworkCapabilities(it) }
+            return caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        }
 }

@@ -52,6 +52,10 @@ class GeminiInferenceRepository(
 
     private var currentStreamJob: Job? = null
 
+    private val networkMonitor by lazy {
+        com.example.jarvisai.data.util.NetworkMonitor(context)
+    }
+
     /**
      * Resolves the active API key for the given provider:
      * 1. Provider-specific key in App Settings (e.g., gemini_api_key, openai_api_key, groq_api_key)
@@ -92,6 +96,34 @@ class GeminiInferenceRepository(
         imageBase64: String?,
         imageMimeType: String?
     ): Flow<String> = flow {
+        // Check for offline/local bypass
+        val isOffline = !networkMonitor.isCurrentlyOnline
+        val localResponse = com.example.jarvisai.data.util.OfflineInferenceEngine.tryLocalOfflineInference(context, prompt, isOffline)
+        if (localResponse != null) {
+            _inferenceState.value = InferenceState.Generating(
+                partialText = localResponse,
+                tokensPerSecond = 100f
+            )
+            val chunks = localResponse.chunked(12)
+            for (chunk in chunks) {
+                emit(chunk)
+                kotlinx.coroutines.delay(10)
+            }
+            
+            // Execute physical command immediately
+            val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
+            val matchResult = actionRegex.find(localResponse)
+            if (matchResult != null) {
+                val jsonPayload = matchResult.groupValues[1]
+                val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
+                val confirmation = "\n\n✓ $actionResultMsg"
+                emit(confirmation)
+            }
+            
+            _inferenceState.value = InferenceState.Idle
+            return@flow
+        }
+
         val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
         val modelDef = CloudAiModel.findById(selectedModelId)
         val apiKey = resolveApiKeyForProvider(modelDef.provider)
