@@ -17,6 +17,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -330,12 +331,24 @@ fun ChatScreen(
                             items = uiState.messages,
                             key = { it.id }
                         ) { message ->
-                            MessageBubble(
-                                message = message,
-                                isSpeaking = uiState.isSpeakingTts && message.role != com.example.jarvisai.domain.model.Role.USER,
-                                onSpeakClick = { viewModel.speakText(it) },
-                                onStopSpeakClick = { viewModel.stopTts() }
-                            )
+                            var visible by remember { mutableStateOf(false) }
+                            LaunchedEffect(message.id) {
+                                visible = true
+                            }
+                            AnimatedVisibility(
+                                visible = visible,
+                                enter = fadeIn(animationSpec = tween(400)) + slideInVertically(
+                                    initialOffsetY = { it / 3 },
+                                    animationSpec = tween(400, easing = FastOutSlowInEasing)
+                                )
+                            ) {
+                                MessageBubble(
+                                    message = message,
+                                    isSpeaking = uiState.isSpeakingTts && message.role != com.example.jarvisai.domain.model.Role.USER,
+                                    onSpeakClick = { viewModel.speakText(it) },
+                                    onStopSpeakClick = { viewModel.stopTts() }
+                                )
+                            }
                         }
                     }
                 }
