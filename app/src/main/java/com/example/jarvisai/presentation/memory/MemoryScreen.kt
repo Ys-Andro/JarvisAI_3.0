@@ -43,7 +43,7 @@ fun MemoryScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "MEMORIA A LARGO PLAZO",
+                        text = "NOTAS Y RECUERDOS",
                         color = JarvisTextPrimary,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 14.sp,
@@ -74,7 +74,7 @@ fun MemoryScreen(
                 containerColor = JarvisPrimary,
                 contentColor = JarvisBackground
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Añadir Memoria")
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Añadir Nota")
             }
         }
     ) { innerPadding ->
@@ -85,10 +85,9 @@ fun MemoryScreen(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Jarvis recuerda automáticamente estos datos entre conversaciones y los integra en las respuestas.",
+                text = "Guarda datos importantes para que el asistente los tenga en cuenta al responderte.",
                 color = JarvisTextSecondary,
                 fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
@@ -108,7 +107,7 @@ fun MemoryScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "No hay recuerdos guardados",
+                            text = "No hay notas guardadas",
                             color = JarvisTextSecondary,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 13.sp
@@ -136,7 +135,7 @@ fun MemoryScreen(
                 containerColor = JarvisSurface,
                 title = {
                     Text(
-                        text = "NUEVO RECUERDO",
+                        text = "NUEVA NOTA",
                         color = JarvisTextPrimary,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 14.sp,
@@ -148,7 +147,7 @@ fun MemoryScreen(
                         OutlinedTextField(
                             value = keyInput,
                             onValueChange = { keyInput = it },
-                            label = { Text("Concepto o Clave (ej. Nombre, Proyecto)", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                            label = { Text("Tema o título (ej. Mi trabajo, Cumpleaños)", fontSize = 11.sp) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = JarvisPrimary,
@@ -162,7 +161,7 @@ fun MemoryScreen(
                         OutlinedTextField(
                             value = valueInput,
                             onValueChange = { valueInput = it },
-                            label = { Text("Información a recordar", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                            label = { Text("Detalle que deseas guardar", fontSize = 11.sp) },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = JarvisPrimary,
                                 unfocusedBorderColor = JarvisBorder,
@@ -175,7 +174,7 @@ fun MemoryScreen(
                         OutlinedTextField(
                             value = categoryInput,
                             onValueChange = { categoryInput = it },
-                            label = { Text("Categoría (Personal, Trabajo, Preferencia)", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                            label = { Text("Categoría (Personal, Trabajo, Preferencias)", fontSize = 11.sp) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = JarvisPrimary,

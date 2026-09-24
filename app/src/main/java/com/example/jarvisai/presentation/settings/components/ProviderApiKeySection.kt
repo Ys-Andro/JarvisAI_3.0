@@ -82,40 +82,40 @@ val PROVIDERS_META = listOf(
         id = "gemini",
         name = "Google Gemini",
         badge = "GOOGLE",
-        placeholder = "AIzaSy... (o configurada en .env)",
-        hint = "Multimodal nativo, visión y generación a alta velocidad.",
+        placeholder = "AIzaSy... (o configurada en el sistema)",
+        hint = "Respuestas rápidas, análisis de imágenes y asistencia general.",
         brandColor = Color(0xFF4285F4)
     ),
     ProviderMeta(
         id = "openrouter",
-        name = "OpenRouter Hub",
+        name = "OpenRouter",
         badge = "ROUTER",
         placeholder = "sk-or-v1-...",
-        hint = "Acceso a más de 100 modelos (DeepSeek, Llama 3, Claude, etc.)",
+        hint = "Accede a diversos modelos adicionales desde una sola cuenta.",
         brandColor = Color(0xFF651FFF)
     ),
     ProviderMeta(
         id = "openai",
-        name = "OpenAI GPT",
+        name = "OpenAI",
         badge = "OPENAI",
         placeholder = "sk-proj-...",
-        hint = "GPT-4o, GPT-4o mini y compatibilidad con endpoints locales.",
+        hint = "Modelos GPT para redacción, análisis de datos y conversación.",
         brandColor = Color(0xFF10A37F)
     ),
     ProviderMeta(
         id = "deepseek",
-        name = "DeepSeek AI",
+        name = "DeepSeek",
         badge = "DEEPSEEK",
         placeholder = "sk-...",
-        hint = "DeepSeek V3 y DeepSeek R1 de razonamiento algorítmico.",
+        hint = "Especializado en razonamiento detallado, lógica y respuestas profundas.",
         brandColor = Color(0xFF0070F3)
     ),
     ProviderMeta(
         id = "groq",
-        name = "Groq Cloud LPU",
+        name = "Groq",
         badge = "GROQ",
         placeholder = "gsk_...",
-        hint = "Inferencia ultrarrápida a más de 300 tokens/segundo.",
+        hint = "Generación con alta velocidad de respuesta para conversaciones dinámicas.",
         brandColor = Color(0xFFF55036)
     ),
     ProviderMeta(
@@ -123,16 +123,16 @@ val PROVIDERS_META = listOf(
         name = "Anthropic Claude",
         badge = "CLAUDE",
         placeholder = "sk-ant-api...",
-        hint = "Claude 3.5 Sonnet líder en código y comprensión analítica.",
+        hint = "Redacción cuidada, síntesis de textos extensos y apoyo en tareas complejas.",
         brandColor = Color(0xFFD97706)
     ),
     ProviderMeta(
         id = "custom",
-        name = "Local GGUF (Termux)",
-        badge = "TERMUX",
-        placeholder = "Tu API Key de Termux / Local",
-        hint = "Clave de API para autenticar y conectar con el servidor local llama-server en Termux (localhost:8080).",
-        brandColor = Color(0xFF00E5FF)
+        name = "Servidor Personal",
+        badge = "PROPIO",
+        placeholder = "Clave opcional para tu servidor",
+        hint = "Conecta con tu propia dirección de servidor compatible.",
+        brandColor = Color(0xFF00B0FF)
     )
 )
 

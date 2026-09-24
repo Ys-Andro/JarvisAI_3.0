@@ -39,8 +39,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // J.A.R.V.I.S. Startup Safety Sentinel: Prevent GGUF crash loops from locking user out
-        com.example.jarvisai.data.util.LocalLlmManager.checkStartupSafety(applicationContext)
         enableEdgeToEdge()
 
         setContent {

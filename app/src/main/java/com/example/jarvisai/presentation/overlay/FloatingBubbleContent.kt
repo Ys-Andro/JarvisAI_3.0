@@ -262,7 +262,7 @@ fun FloatingOverlayHud(
         LaunchedEffect(Unit) {
             kotlinx.coroutines.delay(1800)
             isScanningScreen = false
-            onSendPrompt("Simula que eres J.A.R.V.I.S. y analiza el entorno virtual de la pantalla actual. Haz un diagnóstico rápido de telemetría de interfaz de usuario, indicando qué aplicaciones, textos o procesos clave se detectan activos en este dispositivo.")
+            onSendPrompt("Dame un resumen de lo que tengo abierto en mi teléfono y sugerencias útiles para continuar.")
         }
     }
 
@@ -310,16 +310,16 @@ fun FloatingOverlayHud(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "NEURAL CONDUIT: ACTIVE [SECURE_LINK]",
+                    text = "ASISTENTE EN PANTALLA",
                     color = JarvisTextTertiary,
-                    fontSize = 8.sp,
+                    fontSize = 8.5.sp,
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "SYS_ID: J_0x98A4",
-                    color = JarvisTextTertiary,
-                    fontSize = 8.sp,
+                    text = "LISTO",
+                    color = JarvisAccentGreen,
+                    fontSize = 8.5.sp,
                     fontFamily = FontFamily.Monospace
                 )
             }
@@ -361,7 +361,7 @@ fun FloatingOverlayHud(
 
                     Column {
                         Text(
-                            text = "JARVIS AI // OVERLAY HUD",
+                            text = "JARVIS ASISTENTE",
                             color = JarvisPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,

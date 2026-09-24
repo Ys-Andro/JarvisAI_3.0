@@ -278,9 +278,6 @@ class AndroidLiveVoiceEngine(
 
         engineScope.launch {
             try {
-                val settings = settingsRepository.getSettings().first()
-                val isOffline = !com.example.jarvisai.data.util.NetworkMonitor(context).isCurrentlyOnline || settings.forceOffline
-
                 mainHandler.post {
                     try {
                         if (speechRecognizer == null) {
@@ -291,10 +288,6 @@ class AndroidLiveVoiceEngine(
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
                             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
-                            if (isOffline) {
-                                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                                putExtra("android.speech.extra.DICTATION_MODE", true)
-                            }
                         }
                         speechRecognizer?.cancel()
                         speechRecognizer?.startListening(intent)
@@ -302,7 +295,7 @@ class AndroidLiveVoiceEngine(
                         _sessionState.update {
                             it.copy(
                                 phase = LiveVoicePhase.Listening,
-                                statusLabel = if (isOffline) "Escuchando localmente (Offline)..." else "Escuchando... Habla libremente"
+                                statusLabel = "Escuchando... Puedes hablar"
                             )
                         }
                     } catch (e: Exception) {
@@ -311,7 +304,7 @@ class AndroidLiveVoiceEngine(
                         _sessionState.update {
                             it.copy(
                                 phase = LiveVoicePhase.Idle,
-                                statusLabel = "Toca 'HABLAR AHORA' para reintentar"
+                                statusLabel = "Toca para hablar"
                             )
                         }
                     }

@@ -249,7 +249,7 @@ fun ChatScreen(
                     if (!uiState.isModelLoaded) {
                         val currentModel = CloudAiModel.findById(uiState.selectedModelId)
                         NoModelLoadedBanner(
-                            providerName = if (currentModel.id == "local-llama-cpp") "llama.cpp Nativo (GGUF)" else currentModel.provider.displayName,
+                            providerName = currentModel.provider.displayName,
                             onLoadClick = onNavigateToModels
                         )
                     }
@@ -371,7 +371,6 @@ private fun ChatTopBar(
 
     val brandColor = when (currentModel.provider) {
         com.example.jarvisai.domain.model.ModelProvider.GEMINI -> Color(0xFF4285F4)
-        com.example.jarvisai.domain.model.ModelProvider.LOCAL_LLAMA -> Color(0xFF00E5FF)
         com.example.jarvisai.domain.model.ModelProvider.OPENROUTER -> Color(0xFF8B5CF6)
         com.example.jarvisai.domain.model.ModelProvider.OPENAI -> Color(0xFF10A37F)
         com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> Color(0xFF0070F3)
@@ -441,7 +440,6 @@ private fun ChatTopBar(
                     ) {
                         Text(
                             text = when (currentModel.provider) {
-                                com.example.jarvisai.domain.model.ModelProvider.LOCAL_LLAMA -> "GGUF"
                                 com.example.jarvisai.domain.model.ModelProvider.GEMINI -> "GEMINI"
                                 com.example.jarvisai.domain.model.ModelProvider.OPENAI -> "OPENAI"
                                 com.example.jarvisai.domain.model.ModelProvider.GROQ -> "GROQ"
@@ -694,8 +692,6 @@ private fun NoModelLoadedBanner(
     onLoadClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isLocal = providerName.contains("llama", ignoreCase = true) || providerName.contains("GGUF", ignoreCase = true)
-
     Surface(
         onClick = onLoadClick,
         shape = RoundedCornerShape(12.dp),
@@ -731,14 +727,14 @@ private fun NoModelLoadedBanner(
                 }
                 Column {
                     Text(
-                        text = if (isLocal) "Modelo Local GGUF sin iniciar" else "Falta Clave API de $providerName",
+                        text = "Falta clave de acceso ($providerName)",
                         color = Color(0xFFFF8A80),
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = if (isLocal) "Carga el modelo GGUF en memoria desde Ajustes" else "Configura tu clave o pulsa para elegir otro modelo",
+                        text = "Toca para agregar tu clave o elegir otro proveedor",
                         color = JarvisTextSecondary,
                         fontSize = 10.sp
                     )
@@ -849,7 +845,7 @@ private fun EmptyChatPlaceholder(
                     .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentRed)
             )
             Text(
-                text = if (isModelLoaded) "SISTEMA ONLINE // ${modelName ?: "MULTI-MODEL"}" else "CONFIGURACIÓN REQUERIDA",
+                text = if (isModelLoaded) "CONECTADO // ${modelName ?: "LISTO"}" else "CONFIGURACIÓN PENDIENTE",
                 color = if (isModelLoaded) JarvisAccentGreen else Color(0xFFFF8A80),
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
@@ -861,18 +857,18 @@ private fun EmptyChatPlaceholder(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = "JARVIS NEURAL CORE",
+            text = "ASISTENTE JARVIS",
             color = JarvisTextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.8.sp
+            letterSpacing = 1.5.sp
         )
 
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = "Asistente inteligente con soporte para Gemini, OpenAI, Claude, DeepSeek y Groq.",
+            text = "¿En qué puedo ayudarte hoy? Escribe un mensaje, dicta con voz o sube un documento para comenzar.",
             color = JarvisTextSecondary,
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
@@ -892,8 +888,8 @@ private fun EmptyChatPlaceholder(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TacticalFeatureCard(
-                    title = "Modo Live en Vivo",
-                    subtitle = "Voz bidireccional continua",
+                    title = "Voz en Tiempo Real",
+                    subtitle = "Conversación continua",
                     icon = Icons.Default.GraphicEq,
                     accentColor = JarvisPrimary,
                     onClick = onOpenLiveMode,
@@ -901,8 +897,8 @@ private fun EmptyChatPlaceholder(
                 )
 
                 TacticalFeatureCard(
-                    title = "Modelos & APIs",
-                    subtitle = "Configurar claves y agentes",
+                    title = "Modelos & Claves",
+                    subtitle = "Configuración y proveedores",
                     icon = Icons.Default.Settings,
                     accentColor = JarvisPrimaryLight,
                     onClick = onConfigureModelClick,
@@ -915,8 +911,8 @@ private fun EmptyChatPlaceholder(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TacticalFeatureCard(
-                    title = "Analizar Docs",
-                    subtitle = "PDF, TXT y DOCX",
+                    title = "Leer Documentos",
+                    subtitle = "Preguntas sobre archivos",
                     icon = Icons.Default.Description,
                     accentColor = Color(0xFF64B5F6),
                     onClick = onPickDocument,
@@ -924,8 +920,8 @@ private fun EmptyChatPlaceholder(
                 )
 
                 TacticalFeatureCard(
-                    title = "Biblioteca / Chats",
-                    subtitle = "Historial de sesiones",
+                    title = "Historial de Chats",
+                    subtitle = "Conversaciones anteriores",
                     icon = Icons.Default.FolderOpen,
                     accentColor = Color(0xFF81C784),
                     onClick = onOpenHistory,

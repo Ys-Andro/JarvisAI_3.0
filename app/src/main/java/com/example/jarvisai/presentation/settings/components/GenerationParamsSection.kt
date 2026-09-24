@@ -52,22 +52,22 @@ data class GenerationPreset(
 
 val GENERATION_PRESETS = listOf(
     GenerationPreset(
-        title = "Preciso / Código",
-        description = "Baja aleatoriedad, respuestas técnicas exactas.",
+        title = "Preciso",
+        description = "Respuestas directas y datos exactos.",
         temp = 0.2f,
         topP = 0.8f,
         topK = 20
     ),
     GenerationPreset(
-        title = "Equilibrado (Jarvis)",
-        description = "Tono inteligente, balance ideal para el día a día.",
+        title = "Equilibrado",
+        description = "Balance ideal para el día a día.",
         temp = 0.7f,
         topP = 0.9f,
         topK = 40
     ),
     GenerationPreset(
-        title = "Creativo / Fluido",
-        description = "Máxima inventiva, redacción expansiva y libre.",
+        title = "Creativo",
+        description = "Mayor inventiva y redacción variada.",
         temp = 1.15f,
         topP = 0.95f,
         topK = 60
@@ -87,7 +87,7 @@ fun GenerationParamsSection(
     Column(modifier = modifier.fillMaxWidth()) {
         // Presets Header
         Text(
-            text = "PERFILES RÁPIDOS DE INFERENCIA",
+            text = "MODOS DE RESPUESTA",
             color = JarvisTextSecondary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
@@ -120,36 +120,36 @@ fun GenerationParamsSection(
 
         // Sliders
         SliderParameterCard(
-            title = "Temperatura (Creatividad vs Determinismo)",
+            title = "Nivel de Creatividad",
             valueText = String.format("%.2f", settings.temperature),
             value = settings.temperature,
             valueRange = 0.0f..1.5f,
             steps = 14,
-            hint = "Valores bajos = respuestas exactas y concisas. Valores altos = más variedad imaginativa.",
+            hint = "Valores bajos dan respuestas directas y precisas. Valores altos aportan más variedad e inventiva.",
             onValueChange = onUpdateTemperature
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         SliderParameterCard(
-            title = "Top-P (Nucleus Sampling)",
+            title = "Variedad de Vocabulario (Top-P)",
             valueText = String.format("%.2f", settings.topP),
             value = settings.topP,
             valueRange = 0.1f..1.0f,
             steps = 8,
-            hint = "Controla el conjunto acumulado de palabras más probables consideradas.",
+            hint = "Controla la amplitud del vocabulario considerado al responder.",
             onValueChange = onUpdateTopP
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         SliderParameterCard(
-            title = "Top-K (Límite de Tokens Candidatos)",
+            title = "Enfoque de Palabras (Top-K)",
             valueText = "${settings.topK}",
             value = settings.topK.toFloat(),
             valueRange = 1f..100f,
             steps = 98,
-            hint = "Restringe el muestreo a las K opciones más probables en cada paso.",
+            hint = "Limita la selección a las alternativas más probables en cada frase.",
             onValueChange = { onUpdateTopK(it.roundToInt()) }
         )
 
@@ -162,7 +162,7 @@ fun GenerationParamsSection(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "DIRECTIVA DEL SISTEMA (PROMPT BASE)",
+                text = "INSTRUCCIÓN PRINCIPAL DEL ASISTENTE",
                 color = JarvisTextPrimary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
@@ -224,7 +224,7 @@ fun GenerationParamsSection(
                     modifier = Modifier.padding(2.dp)
                 )
                 Text(
-                    text = "RESTABLECER PARÁMETROS PREDETERMINADOS",
+                    text = "RESTABLECER VALORES INICIALES",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace

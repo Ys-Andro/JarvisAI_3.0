@@ -53,7 +53,7 @@ fun DocumentsScreen(
                             fontSize = 16.sp
                         )
                         Text(
-                            text = "Disponibles offline y en chat",
+                            text = "Archivos para consultar en tus chats",
                             color = JarvisTextSecondary,
                             fontSize = 11.sp
                         )

@@ -29,8 +29,6 @@ secretsGradlePlugin = "2.0.1"
 coil = "2.7.0"
 
 [libraries]
-mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version = "0.10.14" }
-llamacpp-kotlin = { group = "io.github.ljcamargo", name = "llamacpp-kotlin", version = "0.4.0" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

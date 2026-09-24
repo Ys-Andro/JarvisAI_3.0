@@ -308,7 +308,7 @@ private fun SheetHeader(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "$totalCount modelos disponibles • Cloud & GGUF Nativo",
+                text = "$totalCount modelos disponibles",
                 color = JarvisTextSecondary,
                 fontSize = 10.5.sp
             )
@@ -413,15 +413,6 @@ private fun ProviderFilterChipsRow(
             isSelected = selectedProvider == null,
             brandColor = JarvisAccentCyan,
             onClick = { onSelectProvider(null) }
-        )
-
-        // Native GGUF Chip
-        ProviderChip(
-            label = "🧠 LOCAL GGUF",
-            icon = Icons.Default.Memory,
-            isSelected = selectedProvider == ModelProvider.LOCAL_LLAMA,
-            brandColor = Color(0xFF00E5FF),
-            onClick = { onSelectProvider(ModelProvider.LOCAL_LLAMA) }
         )
 
         // Gemini Chip
@@ -720,11 +711,7 @@ private fun TacticalModelCard(
                         )
                     ) {
                         Text(
-                            text = when {
-                                model.provider == ModelProvider.LOCAL_LLAMA -> if (isReady) "GGUF ON" else "OFFLINE"
-                                isReady -> "LISTO"
-                                else -> "SIN CLAVE"
-                            },
+                            text = if (isReady) "LISTO" else "SIN CLAVE",
                             color = if (isReady) JarvisAccentGreen else JarvisAccentOrange,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
@@ -837,7 +824,6 @@ private fun EmptyModelsState(query: String) {
 
 private fun getProviderColor(provider: ModelProvider): Color = when (provider) {
     ModelProvider.GEMINI -> Color(0xFF4285F4)
-    ModelProvider.LOCAL_LLAMA -> Color(0xFF00E5FF)
     ModelProvider.OPENAI -> Color(0xFF10A37F)
     ModelProvider.DEEPSEEK -> Color(0xFF0070F3)
     ModelProvider.GROQ -> Color(0xFFF55036)
@@ -848,7 +834,6 @@ private fun getProviderColor(provider: ModelProvider): Color = when (provider) {
 
 private fun getProviderIcon(provider: ModelProvider): ImageVector = when (provider) {
     ModelProvider.GEMINI -> Icons.Default.AutoAwesome
-    ModelProvider.LOCAL_LLAMA -> Icons.Default.Memory
     ModelProvider.GROQ -> Icons.Default.Lightbulb
     ModelProvider.DEEPSEEK -> Icons.Default.BubbleChart
     ModelProvider.CUSTOM_OPENAI -> Icons.Default.Code
@@ -862,17 +847,16 @@ private fun formatContextLength(tokens: Int): String = when {
 }
 
 private fun getModelTags(model: CloudAiModel): List<String> = when (model.id) {
-    "local-llama-cpp" -> listOf("100% Offline", "ARM NEON", "Privado")
-    "gemini-3.6-flash" -> listOf("Multimodal", "Baja Latencia", "Top Calidad")
-    "gemini-2.0-flash" -> listOf("Multimodal", "Ágil")
-    "gpt-4o" -> listOf("Omnicanal", "Razonamiento")
+    "gemini-3.6-flash" -> listOf("Rápido", "Equilibrado", "Imágenes y texto")
+    "gemini-2.0-flash" -> listOf("Ágil", "Imágenes")
+    "gpt-4o" -> listOf("Completo", "Redacción")
     "gpt-4o-mini" -> listOf("Económico", "Rápido")
-    "deepseek-reasoner" -> listOf("Thinking R1", "Matemáticas")
-    "deepseek-chat" -> listOf("Programación", "Chat V3")
-    "openai/gpt-oss-120b" -> listOf("Groq LPU", "500 tok/s")
-    "openai/gpt-oss-20b" -> listOf("Groq LPU", "Ultra Rápido")
-    "qwen/qwen3.8-27b" -> listOf("Instruct & Thinking", "JSON")
-    "claude-3-5-sonnet-20241022" -> listOf("Código Experto", "Sonnet")
-    "openrouter/auto" -> listOf("Auto Router", "Multi-Cloud")
-    else -> listOf("Red Neuronal")
+    "deepseek-reasoner" -> listOf("Paso a paso", "Lógica")
+    "deepseek-chat" -> listOf("Código", "Chat")
+    "openai/gpt-oss-120b" -> listOf("Groq", "Rápido")
+    "openai/gpt-oss-20b" -> listOf("Groq", "Velocidad alta")
+    "qwen/qwen3.8-27b" -> listOf("Versátil", "Cotidiano")
+    "claude-3-5-sonnet-20241022" -> listOf("Redacción", "Código")
+    "openrouter/auto" -> listOf("Automático", "Multi-proveedor")
+    else -> listOf("Asistente")
 }

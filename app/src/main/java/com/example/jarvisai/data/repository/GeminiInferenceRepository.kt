@@ -98,92 +98,15 @@ class GeminiInferenceRepository(
         imageBase64: String?,
         imageMimeType: String?
     ): Flow<String> = flow {
-        // Check for offline/local bypass
-        val isOffline = !networkMonitor.isCurrentlyOnline || settings.forceOffline
-        val docs = documentRepository.getAllDocuments().first()
-        val mems = memoryRepository.getAllMemories().first()
-        val localResponse = com.example.jarvisai.data.util.OfflineInferenceEngine.tryLocalOfflineInference(
-            context = context,
-            prompt = prompt,
-            isOffline = isOffline,
-            documents = docs,
-            memories = mems
-        )
-        if (localResponse != null) {
-            _inferenceState.value = InferenceState.Generating(
-                partialText = localResponse,
-                tokensPerSecond = 100f
-            )
-            val chunks = localResponse.chunked(12)
-            for (chunk in chunks) {
-                emit(chunk)
-                kotlinx.coroutines.delay(10)
-            }
-            
-            // Execute physical command immediately
-            val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
-            val matchResult = actionRegex.find(localResponse)
-            if (matchResult != null) {
-                val jsonPayload = matchResult.groupValues[1]
-                val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
-                val confirmation = "\n\n✓ $actionResultMsg"
-                emit(confirmation)
-            }
-            
-            _inferenceState.value = InferenceState.Idle
+        if (!networkMonitor.isCurrentlyOnline) {
+            val noConnectionMsg = "No hay conexión a internet. Revisa tu conexión Wi-Fi o datos móviles para conversar con el asistente."
+            _inferenceState.value = InferenceState.Error(noConnectionMsg)
+            emit(noConnectionMsg)
             return@flow
         }
 
         val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
         val modelDef = CloudAiModel.findById(selectedModelId)
-
-        // Native llama.cpp local inference (Camino 1: Integración Nativa vía Gradle)
-        if (modelDef.provider == ModelProvider.LOCAL_LLAMA || selectedModelId == "local-llama-cpp") {
-            if (!com.example.jarvisai.data.util.LocalLlmManager.isModelLoaded.value) {
-                if (com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)) {
-                    com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
-                }
-            }
-
-            if (!com.example.jarvisai.data.util.LocalLlmManager.isModelLoaded.value) {
-                val notLoadedMsg = "⚠️ Motor nativo llama.cpp no cargado en RAM.\n\nPara ejecutar inferencia GGUF offline:\n1. Ve a Ajustes > Modo Offline (llama.cpp)\n2. Descarga un modelo GGUF (Llama 3.2, SmolLM2, Qwen o TinyLlama) o importa tu archivo .gguf\n3. Pulsa 'CARGAR EN RAM'."
-                _inferenceState.value = InferenceState.Error(notLoadedMsg)
-                emit(notLoadedMsg)
-                return@flow
-            }
-
-            val startTime = System.currentTimeMillis()
-            var tokenCount = 0
-            val accumulated = StringBuilder()
-
-            _inferenceState.value = InferenceState.Generating(partialText = "", tokensPerSecond = 0f)
-
-            com.example.jarvisai.data.util.LocalLlmManager.generateStream(prompt).collect { chunk ->
-                tokenCount++
-                accumulated.append(chunk)
-                val elapsedSec = (System.currentTimeMillis() - startTime).coerceAtLeast(1L) / 1000f
-                val tokPerSec = if (elapsedSec > 0) tokenCount / elapsedSec else 0f
-                _inferenceState.value = InferenceState.Generating(
-                    partialText = accumulated.toString(),
-                    tokensPerSecond = tokPerSec
-                )
-                emit(chunk)
-            }
-
-            // Execute physical command if generated
-            val finalResp = accumulated.toString()
-            val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
-            val matchResult = actionRegex.find(finalResp)
-            if (matchResult != null) {
-                val jsonPayload = matchResult.groupValues[1]
-                val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
-                val confirmation = "\n\n✓ $actionResultMsg"
-                emit(confirmation)
-            }
-
-            _inferenceState.value = InferenceState.Idle
-            return@flow
-        }
 
         val apiKey = resolveApiKeyForProvider(modelDef.provider)
         if (apiKey.isBlank()) {
@@ -327,9 +250,9 @@ class GeminiInferenceRepository(
             Log.w(TAG, "AI stream issue: ${e.message}")
             val errorMsg = e.message ?: ""
             val friendlyMsg = if (errorMsg.contains("429") || errorMsg.contains("503") || errorMsg.contains("overloaded") || errorMsg.contains("quota") || errorMsg.contains("resource_exhausted")) {
-                "⚠️ La API del modelo está temporalmente sobrecargada o sin cuota disponible (Límite de peticiones excedido). Puedes consultar tu historial de conversaciones, notas de memoria y documentos analizados sin conexión (Modo Offline) mientras se restablece el servicio."
+                "El servicio está temporalmente ocupado o sin cuota disponible. Por favor, intenta de nuevo en unos minutos."
             } else {
-                "❌ Error en la generación: ${e.message ?: "Error de comunicación con el servicio"}"
+                "No se pudo completar la respuesta: ${e.message ?: "Error de comunicación"}"
             }
             _inferenceState.value = InferenceState.Error(friendlyMsg)
             emit(friendlyMsg)
@@ -339,7 +262,6 @@ class GeminiInferenceRepository(
     override suspend fun stopGeneration() {
         withContext(dispatcher) {
             currentStreamJob?.cancel()
-            com.example.jarvisai.data.util.LocalLlmManager.stopGeneration()
             _inferenceState.value = InferenceState.Idle
         }
     }

@@ -51,19 +51,19 @@ fun MemoryDocsSection(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         KnowledgeCard(
-            title = "Memoria a Largo Plazo",
-            tag = "RAG LOCAL",
-            description = "Jarvis recuerda datos clave, nombres, proyectos y preferencias del usuario para contextualizar conversaciones futuras.",
-            buttonText = "ADMINISTRAR RECUERDOS",
+            title = "Notas y Recuerdos",
+            tag = "MEMORIA",
+            description = "Guarda datos importantes, nombres y preferencias para que el asistente los tenga en cuenta al responderte.",
+            buttonText = "VER NOTAS Y RECUERDOS",
             icon = Icons.Default.Psychology,
             onClick = onNavigateToMemory
         )
 
         KnowledgeCard(
-            title = "Base de Documentos",
-            tag = "KNOWLEDGE BASE",
-            description = "Consulta y gestiona documentos PDF, TXT y DOCX procesados. Listos para consultas profundas y análisis.",
-            buttonText = "EXPLORAR DOCUMENTOS",
+            title = "Documentos Compartidos",
+            tag = "DOCUMENTOS",
+            description = "Gestiona archivos de texto o PDF compartidos para hacer consultas sobre su contenido.",
+            buttonText = "VER DOCUMENTOS",
             icon = Icons.Default.Description,
             onClick = onNavigateToDocuments
         )

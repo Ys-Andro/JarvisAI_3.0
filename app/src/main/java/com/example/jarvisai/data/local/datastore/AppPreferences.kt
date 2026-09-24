@@ -45,7 +45,6 @@ class AppPreferences(private val context: Context) {
         val ANDROID_VOICE_NAME = stringPreferencesKey("android_voice_name")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val SELECTED_AGENT_ID = stringPreferencesKey("selected_agent_id")
-        val FORCE_OFFLINE = booleanPreferencesKey("force_offline")
     }
 
     private val safePreferences: Flow<Preferences> = dataStore.data
@@ -106,8 +105,7 @@ class AppPreferences(private val context: Context) {
             autoTts = preferences[Keys.AUTO_TTS] ?: false,
             ttsSpeed = preferences[Keys.TTS_SPEED] ?: 1.0f,
             ttsPitch = preferences[Keys.TTS_PITCH] ?: 0.85f,
-            androidVoiceName = preferences[Keys.ANDROID_VOICE_NAME] ?: "",
-            forceOffline = preferences[Keys.FORCE_OFFLINE] ?: false
+            androidVoiceName = preferences[Keys.ANDROID_VOICE_NAME] ?: ""
         )
     }
 
@@ -136,7 +134,6 @@ class AppPreferences(private val context: Context) {
             preferences[Keys.TTS_SPEED] = settings.ttsSpeed
             preferences[Keys.TTS_PITCH] = settings.ttsPitch
             preferences[Keys.ANDROID_VOICE_NAME] = settings.androidVoiceName
-            preferences[Keys.FORCE_OFFLINE] = settings.forceOffline
         }
     }
 

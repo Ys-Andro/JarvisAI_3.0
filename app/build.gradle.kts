@@ -108,10 +108,6 @@ dependencies {
   implementation(libs.androidx.room.ktx)
   "ksp"(libs.androidx.room.compiler)
 
-  // Native llama.cpp GGUF Inference (Camino 1: Integración Nativa de llama.cpp Vía Gradle)
-  implementation(libs.llamacpp.kotlin)
-  // implementation(libs.mediapipe.tasks.genai)
-
   // Coroutines
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)

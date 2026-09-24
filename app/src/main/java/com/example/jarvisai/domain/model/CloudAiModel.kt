@@ -9,10 +9,9 @@ enum class ModelProvider(
     OPENROUTER("openrouter", "OpenRouter", "https://openrouter.ai/api/v1"),
     OPENAI("openai", "OpenAI / ChatGPT", "https://api.openai.com/v1"),
     DEEPSEEK("deepseek", "DeepSeek", "https://api.deepseek.com/v1"),
-    GROQ("groq", "Groq (GPT-OSS / Qwen)", "https://api.groq.com/openai/v1"),
+    GROQ("groq", "Groq (Rápido)", "https://api.groq.com/openai/v1"),
     ANTHROPIC("anthropic", "Anthropic Claude", "https://api.anthropic.com/v1"),
-    CUSTOM_OPENAI("custom", "OpenAI Compatible (Ollama / LocalAI / LMStudio)", ""),
-    LOCAL_LLAMA("local_llama", "llama.cpp Nativo (GGUF Local)", "device://local")
+    CUSTOM_OPENAI("custom", "Servidor Personalizado (OpenAI compatible)", "")
 }
 
 data class CloudAiModel(
@@ -24,28 +23,19 @@ data class CloudAiModel(
 ) {
     companion object {
         val ALL_MODELS = listOf(
-            // Native llama.cpp GGUF Model (Camino 1: Integración Nativa vía Gradle)
-            CloudAiModel(
-                id = "local-llama-cpp",
-                provider = ModelProvider.LOCAL_LLAMA,
-                name = "llama.cpp Nativo (GGUF)",
-                description = "Camino 1: Inferencia nativa 100% on-device con llama.cpp vía Gradle",
-                defaultContextLength = 2048
-            ),
-
             // Google Gemini (Default Model: gemini-3.6-flash)
             CloudAiModel(
                 id = "gemini-3.6-flash",
                 provider = ModelProvider.GEMINI,
                 name = "Gemini 3.6 Flash",
-                description = "Predeterminado: Ultrarrápido, multimodal y alta precisión",
+                description = "Recomendado: Rápido, preciso y equilibrado para el día a día",
                 defaultContextLength = 1048576
             ),
             CloudAiModel(
                 id = "gemini-2.0-flash",
                 provider = ModelProvider.GEMINI,
                 name = "Gemini 2.0 Flash",
-                description = "Generación ágil y eficiente multimodal",
+                description = "Respuestas inmediatas y soporte de imágenes y documentos",
                 defaultContextLength = 1048576
             ),
 
@@ -54,14 +44,14 @@ data class CloudAiModel(
                 id = "gpt-4o",
                 provider = ModelProvider.OPENAI,
                 name = "GPT-4o (OpenAI)",
-                description = "Modelo insignia omnicanal de OpenAI",
+                description = "Alta calidad de redacción y comprensión general",
                 defaultContextLength = 128000
             ),
             CloudAiModel(
                 id = "gpt-4o-mini",
                 provider = ModelProvider.OPENAI,
                 name = "GPT-4o Mini (OpenAI)",
-                description = "Rápido y económico para tareas diarias",
+                description = "Rápido y práctico para consultas sencillas",
                 defaultContextLength = 128000
             ),
 
@@ -69,45 +59,45 @@ data class CloudAiModel(
             CloudAiModel(
                 id = "deepseek-chat",
                 provider = ModelProvider.DEEPSEEK,
-                name = "DeepSeek V3 (Chat)",
-                description = "Excelente capacidad de conversación y código",
+                name = "DeepSeek V3",
+                description = "Ideal para redacción, análisis y consultas de programación",
                 defaultContextLength = 64000
             ),
             CloudAiModel(
                 id = "deepseek-reasoner",
                 provider = ModelProvider.DEEPSEEK,
-                name = "DeepSeek R1 (Reasoner)",
-                description = "Razonamiento matemático y algorítmico paso a paso",
+                name = "DeepSeek R1",
+                description = "Explicación detallada paso a paso para preguntas complejas",
                 defaultContextLength = 64000
             ),
 
-            // Groq - current production/preview models
+            // Groq
             CloudAiModel(
                 id = "openai/gpt-oss-120b",
                 provider = ModelProvider.GROQ,
                 name = "GPT-OSS 120B (Groq)",
-                description = "Modelo de propósito general con razonamiento, tool use y alta capacidad",
+                description = "Respuestas completas y detalladas a gran velocidad",
                 defaultContextLength = 131072
             ),
             CloudAiModel(
                 id = "openai/gpt-oss-20b",
                 provider = ModelProvider.GROQ,
                 name = "GPT-OSS 20B (Groq)",
-                description = "Modelo rápido y eficiente para conversación y tareas generales",
+                description = "Conversación fluida y generación ultrarrápida",
                 defaultContextLength = 131072
             ),
             CloudAiModel(
                 id = "qwen/qwen3.8-27b",
                 provider = ModelProvider.GROQ,
                 name = "Qwen 3.8 27B (Groq)",
-                description = "Modelo multimodal con modos thinking/instruct, tool use y JSON",
+                description = "Versátil para razonamiento y preguntas cotidianas",
                 defaultContextLength = 131072
             ),
             CloudAiModel(
                 id = "openai/gpt-oss-safeguard-20b",
                 provider = ModelProvider.GROQ,
                 name = "GPT-OSS Safeguard 20B (Groq)",
-                description = "Modelo especializado en seguridad y moderación",
+                description = "Modelo con respuestas moderadas y seguras",
                 defaultContextLength = 131072
             ),
 
@@ -116,58 +106,58 @@ data class CloudAiModel(
                 id = "claude-3-5-sonnet-20241022",
                 provider = ModelProvider.ANTHROPIC,
                 name = "Claude 3.5 Sonnet",
-                description = "Líder en programación y comprensión contextual",
+                description = "Excelente para redacción extensa y razonamiento",
                 defaultContextLength = 200000
             ),
 
-            // OpenRouter (Multi-model hub)
+            // OpenRouter
             CloudAiModel(
                 id = "openrouter/auto",
                 provider = ModelProvider.OPENROUTER,
-                name = "OpenRouter Auto",
-                description = "Enrutamiento automático al mejor modelo disponible",
+                name = "OpenRouter Automático",
+                description = "Selección automática del modelo más conveniente",
                 defaultContextLength = 128000
             ),
             CloudAiModel(
                 id = "meta-llama/llama-3.3-70b-instruct",
                 provider = ModelProvider.OPENROUTER,
-                name = "Llama 3.3 70B (OpenRouter)",
-                description = "Llama 3.3 de alto rendimiento vía OpenRouter",
+                name = "Llama 3.3 70B",
+                description = "Modelo abierto con buen nivel de redacción",
                 defaultContextLength = 128000
             ),
             CloudAiModel(
                 id = "deepseek/deepseek-r1",
                 provider = ModelProvider.OPENROUTER,
                 name = "DeepSeek R1 (OpenRouter)",
-                description = "Razonamiento matemático y algorítmico profundo",
+                description = "Análisis profundo y razonamiento paso a paso",
                 defaultContextLength = 64000
             ),
             CloudAiModel(
                 id = "deepseek/deepseek-chat",
                 provider = ModelProvider.OPENROUTER,
                 name = "DeepSeek V3 (OpenRouter)",
-                description = "Chat y programación de última generación",
+                description = "Conversación fluida y asistencia de código",
                 defaultContextLength = 64000
             ),
             CloudAiModel(
                 id = "anthropic/claude-3.5-sonnet",
                 provider = ModelProvider.OPENROUTER,
                 name = "Claude 3.5 Sonnet (OpenRouter)",
-                description = "Razonamiento y código de Anthropic vía OpenRouter",
+                description = "Redacción cuidada y análisis detallado",
                 defaultContextLength = 200000
             ),
             CloudAiModel(
                 id = "google/gemini-2.0-flash-001",
                 provider = ModelProvider.OPENROUTER,
                 name = "Gemini 2.0 Flash (OpenRouter)",
-                description = "Modelo multimodal ágil de Google vía OpenRouter",
+                description = "Respuestas rápidas de Gemini a través de OpenRouter",
                 defaultContextLength = 1048576
             ),
             CloudAiModel(
                 id = "mistralai/mistral-large-2411",
                 provider = ModelProvider.OPENROUTER,
-                name = "Mistral Large (OpenRouter)",
-                description = "Modelo insignia razonador de Mistral AI",
+                name = "Mistral Large",
+                description = "Respuestas precisas con razonamiento avanzado",
                 defaultContextLength = 128000
             )
         )

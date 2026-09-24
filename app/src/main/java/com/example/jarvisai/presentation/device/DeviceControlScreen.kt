@@ -155,7 +155,7 @@ fun DeviceControlScreen(
             // Services Activation Card
             item {
                 Text(
-                    text = "SERVICIOS DE SISTEMA Y ACCESIBILIDAD",
+                    text = "PERMISOS Y SERVICIOS",
                     color = JarvisTextTertiary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -166,8 +166,8 @@ fun DeviceControlScreen(
 
             item {
                 ServiceStatusCard(
-                    title = "Servicio de Accesibilidad JarvisAI",
-                    description = "Permite gestos automáticos, pulsar botones, escribir texto y navegar entre apps en segundo plano.",
+                    title = "Servicio de Accesibilidad",
+                    description = "Permite a Jarvis ayudarte a interactuar con botones y navegar entre aplicaciones cuando se lo pidas.",
                     isActive = isAccessibilityEnabled,
                     icon = Icons.Default.AccessibilityNew,
                     onConfigureClick = {
@@ -178,8 +178,8 @@ fun DeviceControlScreen(
 
             item {
                 ServiceStatusCard(
-                    title = "Lector de Notificaciones JarvisAI",
-                    description = "Permite a Jarvis leer alertas entrantes de WhatsApp, correo, SMS y resumirlas por voz.",
+                    title = "Lectura de Notificaciones",
+                    description = "Permite consultar y resumir avisos o mensajes recientes de tus aplicaciones.",
                     isActive = isNotificationAccessEnabled,
                     icon = Icons.Default.NotificationsActive,
                     onConfigureClick = {
@@ -233,7 +233,7 @@ fun DeviceControlScreen(
 
                                 Column {
                                     Text(
-                                        text = "Burbuja Flotante Asistente (Overlay)",
+                                        text = "Botón flotante en pantalla",
                                         color = JarvisTextPrimary,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
@@ -274,7 +274,7 @@ fun DeviceControlScreen(
                         }
 
                         Text(
-                            text = "Muestra el orbe holográfico flotante de Jarvis sobre cualquier app. Puedes arrastrarlo por la pantalla, tocarlo para abrir el HUD de control rápido, dictar con voz o hacer preguntas instantáneas a la IA.",
+                            text = "Muestra un botón flotante para hablar o interactuar con el asistente sin salir de tus otras aplicaciones.",
                             color = JarvisTextSecondary,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
@@ -351,7 +351,7 @@ fun DeviceControlScreen(
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "CONTROLES DE HARDWARE DIRECTOS",
+                    text = "ACCESOS RÁPIDOS",
                     color = JarvisTextTertiary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -380,7 +380,7 @@ fun DeviceControlScreen(
             // Quick Gestures & Navigation
             item {
                 Text(
-                    text = "GESTOS Y NAVEGACIÓN GLOBAL",
+                    text = "ACCIONES DE PANTALLA",
                     color = JarvisTextTertiary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -400,7 +400,7 @@ fun DeviceControlScreen(
             if (isNotificationAccessEnabled) {
                 item {
                     Text(
-                        text = "NOTIFICACIONES RECIENTES CAPTURADAS (${recentNotifications.size})",
+                        text = "AVISOS RECIENTES (${recentNotifications.size})",
                         color = JarvisTextTertiary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -418,7 +418,7 @@ fun DeviceControlScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder)
                         ) {
                             Text(
-                                text = "No hay notificaciones recientes en el buffer.",
+                                text = "No hay notificaciones recientes.",
                                 color = JarvisTextSecondary,
                                 fontSize = 12.sp,
                                 fontFamily = FontFamily.Monospace,
@@ -437,7 +437,7 @@ fun DeviceControlScreen(
             // Command Cheat Sheet
             item {
                 Text(
-                    text = "EJEMPLOS DE COMANDOS POR VOZ / TEXTO",
+                    text = "EJEMPLOS DE PETICIONES",
                     color = JarvisTextTertiary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -497,7 +497,7 @@ private fun DeviceControlTopBar(
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "AUTOMATIZACIÓN & ACCESIBILIDAD JARVISAI",
+                    text = "HERRAMIENTAS Y ACCESOS DIRECTOS",
                     color = JarvisAccentCyan,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace
@@ -976,14 +976,14 @@ private fun CommandsCheatSheetCard() {
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            CommandExampleItem("🔦", "\"Jarvis, enciende la linterna\"", "Control de hardware")
-            CommandExampleItem("⏰", "\"Pon una alarma a las 7:00 AM\"", "AlarmClock Service")
-            CommandExampleItem("💬", "\"Abre WhatsApp y envía un mensaje a...\"", "Intents y accesibilidad")
-            CommandExampleItem("🎵", "\"Reproduce música en Spotify\"", "Control multimedia")
-            CommandExampleItem("🧭", "\"Navega a la Ciudad de México\"", "Google Maps Navigation")
-            CommandExampleItem("🔊", "\"Sube el volumen al 80%\"", "AudioManager System")
-            CommandExampleItem("📱", "\"¿Cuánta batería tengo?\"", "Battery Telemetry")
-            CommandExampleItem("🔔", "\"Lee mis notificaciones recientes\"", "Notification Listener")
+            CommandExampleItem("🔦", "\"Jarvis, enciende la linterna\"", "Linterna")
+            CommandExampleItem("⏰", "\"Pon una alarma a las 7:00 AM\"", "Alarmas y reloj")
+            CommandExampleItem("💬", "\"Abre WhatsApp y envía un mensaje a...\"", "Mensajes y apps")
+            CommandExampleItem("🎵", "\"Reproduce música en Spotify\"", "Música")
+            CommandExampleItem("🧭", "\"Navega a la Ciudad de México\"", "Rutas y mapas")
+            CommandExampleItem("🔊", "\"Sube el volumen al 80%\"", "Sonido")
+            CommandExampleItem("📱", "\"¿Cuánta batería tengo?\"", "Batería")
+            CommandExampleItem("🔔", "\"Lee mis notificaciones recientes\"", "Notificaciones")
         }
     }
 }

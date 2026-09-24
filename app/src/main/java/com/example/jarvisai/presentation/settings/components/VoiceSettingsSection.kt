@@ -66,27 +66,27 @@ data class VoiceOption(
 val VOICE_OPTIONS = listOf(
     VoiceOption(
         id = "",
-        title = "Jarvis Asistente Automático",
+        title = "Voz del sistema (Predeterminada)",
         tag = "DEFECTO",
-        description = "Selección inteligente del sintetizador con tono grave Jarvis."
+        description = "Utiliza la voz configurada por defecto en tu teléfono."
     ),
     VoiceOption(
         id = "es-es-x-eee#male_1-local",
-        title = "Español - Masculino Asistente",
+        title = "Español (Masculina)",
         tag = "ES",
-        description = "Dicción neutral optimizada para respuestas en español."
+        description = "Pronunciación en español para las respuestas."
     ),
     VoiceOption(
         id = "en-gb-x-rjs#male_1-local",
-        title = "Inglés UK - Británico Jarvis",
+        title = "Inglés (Británica)",
         tag = "UK",
-        description = "Acento sofisticado estilo Paul Bettany (Jarvis original)."
+        description = "Acento británico clásico."
     ),
     VoiceOption(
         id = "en-us-x-sfg#male_1-local",
-        title = "Inglés US - Masculino 1",
+        title = "Inglés (Norteamericana)",
         tag = "US",
-        description = "Tono claro, profesional y directo."
+        description = "Tono claro y directo."
     )
 )
 
@@ -97,10 +97,10 @@ data class VoiceTonePreset(
 )
 
 val VOICE_PRESETS = listOf(
-    VoiceTonePreset("Jarvis Grave", 0.82f, 1.0f),
-    VoiceTonePreset("Voz Natural", 1.0f, 1.0f),
-    VoiceTonePreset("Protocolo Rápido", 0.90f, 1.25f),
-    VoiceTonePreset("Analítico Calmo", 0.75f, 0.90f)
+    VoiceTonePreset("Grave", 0.82f, 1.0f),
+    VoiceTonePreset("Natural", 1.0f, 1.0f),
+    VoiceTonePreset("Rápida", 0.90f, 1.25f),
+    VoiceTonePreset("Pausada", 0.75f, 0.90f)
 )
 
 @Composable
@@ -130,14 +130,14 @@ fun VoiceSettingsSection(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Lectura Automática de Respuestas",
+                        text = "Lectura en voz alta",
                         color = JarvisTextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Jarvis sintetizará en voz alta cada mensaje completado.",
+                        text = "Escucha las respuestas leídas automáticamente al terminar.",
                         color = JarvisTextSecondary,
                         fontSize = 11.sp
                     )
@@ -161,7 +161,7 @@ fun VoiceSettingsSection(
 
         // Preset Tones Row
         Text(
-            text = "PREAJUSTES DE TIMBRE DE VOZ",
+            text = "TONOS RÁPIDOS",
             color = JarvisTextSecondary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
@@ -213,7 +213,7 @@ fun VoiceSettingsSection(
 
         // Voice Profile Options
         Text(
-            text = "MOTOR Y PERFIL DE VOZ",
+            text = "VOCES DISPONIBLES",
             color = JarvisTextSecondary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
@@ -252,7 +252,7 @@ fun VoiceSettingsSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Tono de Voz (Pitch - Grave / Agudo)",
+                        text = "Tono (Grave / Agudo)",
                         color = JarvisTextPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
@@ -338,7 +338,7 @@ fun VoiceSettingsSection(
                     modifier = Modifier.size(20.dp)
                 )
                 Text(
-                    text = "PROBAR VOZ EN TIEMPO REAL",
+                    text = "PROBAR VOZ",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,

@@ -40,12 +40,12 @@ import androidx.compose.material.icons.filled.Smartphone
 
 enum class SettingsCategory(val title: String, val icon: ImageVector) {
     ALL("Todos", Icons.Default.AllInclusive),
-    DEVICE_CONTROL("Control Dispositivo", Icons.Default.Smartphone),
-    MODELS_API("Modelos & API", Icons.Default.Key),
+    DEVICE_CONTROL("Control", Icons.Default.Smartphone),
+    MODELS_API("Modelos", Icons.Default.Key),
     AGENTS("Personalidad", Icons.Default.SmartToy),
-    PARAMETERS("Parámetros", Icons.Default.Tune),
-    VOICE("Voz & TTS", Icons.Default.RecordVoiceOver),
-    DATA("Memoria & Docs", Icons.Default.Description)
+    PARAMETERS("Ajustes", Icons.Default.Tune),
+    VOICE("Voz", Icons.Default.RecordVoiceOver),
+    DATA("Memoria", Icons.Default.Description)
 }
 
 @Composable
