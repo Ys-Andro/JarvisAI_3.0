@@ -5,7 +5,7 @@ import java.util.regex.Pattern
 
 object OfflineInferenceEngine {
 
-    fun tryLocalOfflineInference(
+    suspend fun tryLocalOfflineInference(
         context: Context,
         prompt: String,
         isOffline: Boolean,
@@ -153,6 +153,19 @@ object OfflineInferenceEngine {
                 val docList = documents.joinToString("\n") { "- ${it.title} (${it.fileType})" }
                 return "Señor, estoy operando fuera de línea. He listado sus documentos de Room disponibles localmente:\n\n$docList\n\nSi desea que lea uno de ellos, indíqueme su nombre exacto."
             }
+        }
+
+        // Fallback or Native llama.cpp GGUF Local LLM Inference
+        if (isOffline) {
+            // Check if Native llama.cpp Local LLM is available and initialized in RAM
+            if (LocalLlmManager.isModelLoaded.value) {
+                val localLlmResponse = LocalLlmManager.generateResponse(prompt)
+                if (localLlmResponse != null && localLlmResponse.isNotBlank()) {
+                    return "[🧠 J.A.R.V.I.S. llama.cpp GGUF Nativo]:\n$localLlmResponse"
+                }
+            }
+            
+            return "⚠️ Modo Fuera de Línea Activo, Señor. Actualmente no dispongo de conexión a internet para consultar con los modelos en la nube. Sin embargo, mis sistemas lógicos de hardware local están activos para procesar controles físicos (linterna, volumen, batería, alarmas, temporizadores, abrir aplicaciones, llamadas, gestos de pantalla). Intente uno de estos comandos locales."
         }
 
         return null

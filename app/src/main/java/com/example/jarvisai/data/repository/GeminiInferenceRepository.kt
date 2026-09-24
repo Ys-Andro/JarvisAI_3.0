@@ -97,49 +97,95 @@ class GeminiInferenceRepository(
         settings: GenerationSettings,
         imageBase64: String?,
         imageMimeType: String?
-    ): Flow<String> {
-        var currentModelDef: CloudAiModel? = null
-        return flow {
-            // Check for offline/local bypass
-            val isOffline = !networkMonitor.isCurrentlyOnline || settings.forceOffline
-            val docs = documentRepository.getAllDocuments().first()
-            val mems = memoryRepository.getAllMemories().first()
-            val localResponse = com.example.jarvisai.data.util.OfflineInferenceEngine.tryLocalOfflineInference(
-                context = context,
-                prompt = prompt,
-                isOffline = isOffline,
-                documents = docs,
-                memories = mems
+    ): Flow<String> = flow {
+        // Check for offline/local bypass
+        val isOffline = !networkMonitor.isCurrentlyOnline || settings.forceOffline
+        val docs = documentRepository.getAllDocuments().first()
+        val mems = memoryRepository.getAllMemories().first()
+        val localResponse = com.example.jarvisai.data.util.OfflineInferenceEngine.tryLocalOfflineInference(
+            context = context,
+            prompt = prompt,
+            isOffline = isOffline,
+            documents = docs,
+            memories = mems
+        )
+        if (localResponse != null) {
+            _inferenceState.value = InferenceState.Generating(
+                partialText = localResponse,
+                tokensPerSecond = 100f
             )
-            if (localResponse != null) {
-                _inferenceState.value = InferenceState.Generating(
-                    partialText = localResponse,
-                    tokensPerSecond = 100f
-                )
-                val chunks = localResponse.chunked(12)
-                for (chunk in chunks) {
-                    emit(chunk)
-                    kotlinx.coroutines.delay(10)
+            val chunks = localResponse.chunked(12)
+            for (chunk in chunks) {
+                emit(chunk)
+                kotlinx.coroutines.delay(10)
+            }
+            
+            // Execute physical command immediately
+            val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
+            val matchResult = actionRegex.find(localResponse)
+            if (matchResult != null) {
+                val jsonPayload = matchResult.groupValues[1]
+                val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
+                val confirmation = "\n\n✓ $actionResultMsg"
+                emit(confirmation)
+            }
+            
+            _inferenceState.value = InferenceState.Idle
+            return@flow
+        }
+
+        val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
+        val modelDef = CloudAiModel.findById(selectedModelId)
+
+        // Native llama.cpp local inference (Camino 1: Integración Nativa vía Gradle)
+        if (modelDef.provider == ModelProvider.LOCAL_LLAMA || selectedModelId == "local-llama-cpp") {
+            if (!com.example.jarvisai.data.util.LocalLlmManager.isModelLoaded.value) {
+                if (com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)) {
+                    com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
                 }
-                
-                // Execute physical command immediately
-                val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
-                val matchResult = actionRegex.find(localResponse)
-                if (matchResult != null) {
-                    val jsonPayload = matchResult.groupValues[1]
-                    val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
-                    val confirmation = "\n\n✓ $actionResultMsg"
-                    emit(confirmation)
-                }
-                
-                _inferenceState.value = InferenceState.Idle
+            }
+
+            if (!com.example.jarvisai.data.util.LocalLlmManager.isModelLoaded.value) {
+                val notLoadedMsg = "⚠️ Motor nativo llama.cpp no cargado en RAM.\n\nPara ejecutar inferencia GGUF offline:\n1. Ve a Ajustes > Modo Offline (llama.cpp)\n2. Descarga un modelo GGUF (Llama 3.2, SmolLM2, Qwen o TinyLlama) o importa tu archivo .gguf\n3. Pulsa 'CARGAR EN RAM'."
+                _inferenceState.value = InferenceState.Error(notLoadedMsg)
+                emit(notLoadedMsg)
                 return@flow
             }
 
-            val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
-            val modelDef = CloudAiModel.findById(selectedModelId)
-            currentModelDef = modelDef
-            val apiKey = resolveApiKeyForProvider(modelDef.provider)
+            val startTime = System.currentTimeMillis()
+            var tokenCount = 0
+            val accumulated = StringBuilder()
+
+            _inferenceState.value = InferenceState.Generating(partialText = "", tokensPerSecond = 0f)
+
+            com.example.jarvisai.data.util.LocalLlmManager.generateStream(prompt).collect { chunk ->
+                tokenCount++
+                accumulated.append(chunk)
+                val elapsedSec = (System.currentTimeMillis() - startTime).coerceAtLeast(1L) / 1000f
+                val tokPerSec = if (elapsedSec > 0) tokenCount / elapsedSec else 0f
+                _inferenceState.value = InferenceState.Generating(
+                    partialText = accumulated.toString(),
+                    tokensPerSecond = tokPerSec
+                )
+                emit(chunk)
+            }
+
+            // Execute physical command if generated
+            val finalResp = accumulated.toString()
+            val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
+            val matchResult = actionRegex.find(finalResp)
+            if (matchResult != null) {
+                val jsonPayload = matchResult.groupValues[1]
+                val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
+                val confirmation = "\n\n✓ $actionResultMsg"
+                emit(confirmation)
+            }
+
+            _inferenceState.value = InferenceState.Idle
+            return@flow
+        }
+
+        val apiKey = resolveApiKeyForProvider(modelDef.provider)
         if (apiKey.isBlank()) {
             val errorMsg = "Por favor ingresa tu API Key para ${modelDef.provider.displayName} en Ajustes."
             _inferenceState.value = InferenceState.Error(errorMsg)
@@ -280,12 +326,8 @@ class GeminiInferenceRepository(
         .catch { e ->
             Log.w(TAG, "AI stream issue: ${e.message}")
             val errorMsg = e.message ?: ""
-            val friendlyMsg = if (currentModelDef?.id == "local-llama-termux") {
-                "⚠️ No se pudo establecer conexión con Termux en http://127.0.0.1:8080.\n\nPor favor, verifique que ha iniciado llama-server en Termux ejecutando:\nllama-server --model <su_modelo>.gguf --port 8080"
-            } else if (e is java.net.ConnectException || e is java.net.UnknownHostException || errorMsg.contains("connect", ignoreCase = true) || errorMsg.contains("host", ignoreCase = true)) {
-                "⚠️ Sin conexión a internet o servidor inalcanzable.\n\nPuedes chatear de forma 100% offline y privada seleccionando el modelo local 'Llama 3.2 1B (Local GGUF Termux)' (asegúrese de correr llama-server en Termux)."
-            } else if (errorMsg.contains("429") || errorMsg.contains("503") || errorMsg.contains("overloaded") || errorMsg.contains("quota") || errorMsg.contains("resource_exhausted")) {
-                "⚠️ La API del modelo está temporalmente sobrecargada o sin cuota disponible. Puedes chatear offline usando el modelo local 'Llama 3.2 1B (Local GGUF Termux)' a través de Termux."
+            val friendlyMsg = if (errorMsg.contains("429") || errorMsg.contains("503") || errorMsg.contains("overloaded") || errorMsg.contains("quota") || errorMsg.contains("resource_exhausted")) {
+                "⚠️ La API del modelo está temporalmente sobrecargada o sin cuota disponible (Límite de peticiones excedido). Puedes consultar tu historial de conversaciones, notas de memoria y documentos analizados sin conexión (Modo Offline) mientras se restablece el servicio."
             } else {
                 "❌ Error en la generación: ${e.message ?: "Error de comunicación con el servicio"}"
             }
@@ -293,11 +335,11 @@ class GeminiInferenceRepository(
             emit(friendlyMsg)
         }
         .flowOn(dispatcher)
-    }
 
     override suspend fun stopGeneration() {
         withContext(dispatcher) {
             currentStreamJob?.cancel()
+            com.example.jarvisai.data.util.LocalLlmManager.stopGeneration()
             _inferenceState.value = InferenceState.Idle
         }
     }

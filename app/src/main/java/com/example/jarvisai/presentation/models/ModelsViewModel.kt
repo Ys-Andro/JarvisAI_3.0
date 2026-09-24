@@ -30,6 +30,17 @@ class ModelsViewModel(
     private val _uiState = MutableStateFlow(ModelsUiState())
     val uiState: StateFlow<ModelsUiState> = _uiState.asStateFlow()
 
+    // Local LLM State Flows (Camino 1: llama.cpp Nativo vía Gradle)
+    val localLlmDownloading = com.example.jarvisai.data.util.LocalLlmManager.isDownloading
+    val localLlmProgress = com.example.jarvisai.data.util.LocalLlmManager.downloadProgress
+    val localLlmDownloaded = com.example.jarvisai.data.util.LocalLlmManager.isModelDownloaded
+    val localLlmInitializing = com.example.jarvisai.data.util.LocalLlmManager.isInitializing
+    val localLlmLoaded = com.example.jarvisai.data.util.LocalLlmManager.isModelLoaded
+    val localLlmLoadedName = com.example.jarvisai.data.util.LocalLlmManager.loadedModelName
+    val localLlmTokensPerSec = com.example.jarvisai.data.util.LocalLlmManager.tokensPerSecond
+    val localLlmDiagnostics = com.example.jarvisai.data.util.LocalLlmManager.engineDiagnostics
+    val presetGgufModels = com.example.jarvisai.data.util.LocalLlmManager.PRESET_MODELS
+
     init {
         observeSettings()
         observeTheme()
@@ -37,6 +48,96 @@ class ModelsViewModel(
         observeGeminiModel()
         observeProviderApiKeys()
         observeSelectedAgent()
+        
+        // Auto-initialize local LLM in background if downloaded
+        viewModelScope.launch {
+            if (com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)) {
+                com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+            }
+        }
+    }
+
+    fun selectPreset(presetId: String) {
+        _uiState.update { it.copy(selectedPresetId = presetId) }
+    }
+
+    fun downloadLocalLlm(presetId: String? = null) {
+        val targetPresetId = presetId ?: _uiState.value.selectedPresetId
+        val preset = presetGgufModels.find { it.id == targetPresetId } ?: presetGgufModels.first()
+        viewModelScope.launch {
+            _uiState.update { it.copy(statusMessage = "Iniciando descarga de ${preset.name} (${preset.sizeFormatted}), por favor no cierre la app...") }
+            val success = com.example.jarvisai.data.util.LocalLlmManager.downloadModel(context, preset.id)
+            if (success) {
+                _uiState.update { it.copy(statusMessage = "¡${preset.name} descargado con éxito! Inicializando motor nativo llama.cpp...") }
+                val initSuccess = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+                if (initSuccess) {
+                    _uiState.update { it.copy(statusMessage = "¡J.A.R.V.I.S. llama.cpp activo y listo para operar en RAM! 🧠") }
+                } else {
+                    _uiState.update { it.copy(errorMessage = "Modelo GGUF descargado, pero falló la carga en RAM.") }
+                }
+            } else {
+                _uiState.update { it.copy(errorMessage = "Error en la descarga del modelo GGUF. Verifique su conexión.") }
+            }
+        }
+    }
+
+    fun deleteLocalLlm() {
+        val deleted = com.example.jarvisai.data.util.LocalLlmManager.deleteModel(context)
+        if (deleted) {
+            _uiState.update { it.copy(statusMessage = "Modelo GGUF eliminado del almacenamiento del dispositivo.") }
+        } else {
+            _uiState.update { it.copy(statusMessage = "No se encontró ningún archivo de modelo para eliminar.") }
+        }
+    }
+
+    fun initializeLocalLlm() {
+        viewModelScope.launch {
+            val initialized = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+            if (initialized) {
+                _uiState.update { it.copy(statusMessage = "Motor nativo llama.cpp cargado exitosamente en RAM.") }
+            } else {
+                _uiState.update { it.copy(errorMessage = "No se pudo cargar el modelo GGUF en memoria. Verifique que exista.") }
+            }
+        }
+    }
+
+    fun unloadLocalLlm() {
+        com.example.jarvisai.data.util.LocalLlmManager.unloadModel()
+        _uiState.update { it.copy(statusMessage = "Modelo GGUF liberado de la memoria RAM.") }
+    }
+
+    fun runLlamaBenchmark() {
+        viewModelScope.launch {
+            if (!localLlmLoaded.value) {
+                _uiState.update { it.copy(errorMessage = "Primero cargue el modelo GGUF en RAM para ejecutar el benchmark.") }
+                return@launch
+            }
+            _uiState.update { it.copy(isBenchmarking = true, benchmarkResult = "Evaluando velocidad de inferencia nativa...") }
+            val startTime = System.currentTimeMillis()
+            var generatedTokens = 0
+            val prompt = "Responde en una sola frase breve tu función como asistente inteligente J.A.R.V.I.S."
+            
+            try {
+                com.example.jarvisai.data.util.LocalLlmManager.generateStream(prompt).collect {
+                    generatedTokens++
+                }
+                val durationSec = (System.currentTimeMillis() - startTime).coerceAtLeast(1L) / 1000f
+                val tokSec = String.format(java.util.Locale.US, "%.1f", (generatedTokens / durationSec))
+                _uiState.update {
+                    it.copy(
+                        isBenchmarking = false,
+                        benchmarkResult = "✓ Velocidad: $tokSec tokens/s | Latencia total: ${System.currentTimeMillis() - startTime}ms"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isBenchmarking = false,
+                        benchmarkResult = "Error en el benchmark: ${e.message}"
+                    )
+                }
+            }
+        }
     }
 
     private fun observeSelectedAgent() {
@@ -170,7 +271,6 @@ class ModelsViewModel(
             "deepseek" -> trimmed.startsWith("sk-") && trimmed.length >= 20
             "groq" -> trimmed.startsWith("gsk_") && trimmed.length >= 20
             "anthropic" -> trimmed.startsWith("sk-ant-") && trimmed.length >= 20
-            "custom" -> trimmed.length >= 3
             else -> trimmed.length >= 10
         }
         val message = if (isValid) "¡Clave API de $providerId válida y verificada! ✓" else "Formato de clave inválido para $providerId ❌"
@@ -258,5 +358,47 @@ class ModelsViewModel(
 
     fun dismissMessage() {
         _uiState.update { it.copy(statusMessage = null, errorMessage = null) }
+    }
+
+    fun copySelectedModelFile(uri: android.net.Uri) {
+        viewModelScope.launch {
+            // Get original file name
+            var fileName = "modelo.gguf"
+            try {
+                val cursor = context.contentResolver.query(uri, null, null, null, null)
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1) {
+                            fileName = it.getString(nameIndex) ?: "modelo.gguf"
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ModelsViewModel", "Error reading file name", e)
+            }
+
+            _uiState.update { it.copy(statusMessage = "Validando e importando modelo GGUF ($fileName)...") }
+            val isGguf = com.example.jarvisai.data.util.LocalLlmManager.isValidGguf(context, uri)
+            if (!isGguf && !fileName.lowercase().endsWith(".gguf")) {
+                _uiState.update { it.copy(errorMessage = "El archivo seleccionado no parece ser un modelo GGUF válido para llama.cpp.") }
+                return@launch
+            }
+
+            val success = com.example.jarvisai.data.util.LocalLlmManager.importGgufFromUri(context, uri)
+            
+            if (success) {
+                com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)
+                _uiState.update { it.copy(statusMessage = "¡Modelo GGUF importado con éxito! Inicializando motor nativo en RAM...") }
+                val initialized = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+                if (initialized) {
+                    _uiState.update { it.copy(statusMessage = "¡Motor llama.cpp activo y listo con $fileName! 🧠") }
+                } else {
+                    _uiState.update { it.copy(errorMessage = "Modelo importado, pero falló la carga en memoria RAM.") }
+                }
+            } else {
+                _uiState.update { it.copy(errorMessage = "Error al copiar el archivo GGUF. Asegúrese de tener espacio libre suficiente.") }
+            }
+        }
     }
 }

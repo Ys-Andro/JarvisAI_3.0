@@ -11,7 +11,8 @@ enum class ModelProvider(
     DEEPSEEK("deepseek", "DeepSeek", "https://api.deepseek.com/v1"),
     GROQ("groq", "Groq (GPT-OSS / Qwen)", "https://api.groq.com/openai/v1"),
     ANTHROPIC("anthropic", "Anthropic Claude", "https://api.anthropic.com/v1"),
-    CUSTOM_OPENAI("custom", "OpenAI Compatible (Ollama / LocalAI / LMStudio)", "")
+    CUSTOM_OPENAI("custom", "OpenAI Compatible (Ollama / LocalAI / LMStudio)", ""),
+    LOCAL_LLAMA("local_llama", "llama.cpp Nativo (GGUF Local)", "device://local")
 }
 
 data class CloudAiModel(
@@ -23,12 +24,12 @@ data class CloudAiModel(
 ) {
     companion object {
         val ALL_MODELS = listOf(
-            // Local Termux GGUF Model
+            // Native llama.cpp GGUF Model (Camino 1: Integración Nativa vía Gradle)
             CloudAiModel(
-                id = "local-llama-termux",
-                provider = ModelProvider.CUSTOM_OPENAI,
-                name = "Llama 3.2 1B (Local GGUF Termux)",
-                description = "Ejecuta tu modelo .gguf local a través de llama-server en Termux (localhost:8080)",
+                id = "local-llama-cpp",
+                provider = ModelProvider.LOCAL_LLAMA,
+                name = "llama.cpp Nativo (GGUF)",
+                description = "Camino 1: Inferencia nativa 100% on-device con llama.cpp vía Gradle",
                 defaultContextLength = 2048
             ),
 

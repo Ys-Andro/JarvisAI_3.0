@@ -7,7 +7,7 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk = 35
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.aistudio.jarvisai.anzqdm"
@@ -108,8 +108,9 @@ dependencies {
   implementation(libs.androidx.room.ktx)
   "ksp"(libs.androidx.room.compiler)
 
-  // MediaPipe LLM Inference
-  implementation(libs.mediapipe.tasks.genai)
+  // Native llama.cpp GGUF Inference (Camino 1: Integración Nativa de llama.cpp Vía Gradle)
+  implementation(libs.llamacpp.kotlin)
+  // implementation(libs.mediapipe.tasks.genai)
 
   // Coroutines
   implementation(libs.kotlinx.coroutines.android)

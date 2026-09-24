@@ -11,6 +11,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -76,6 +77,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -90,8 +92,10 @@ import com.example.jarvisai.data.util.DeviceController
 import com.example.jarvisai.domain.model.CloudAiModel
 import com.example.jarvisai.presentation.chat.components.ChatInputBar
 import com.example.jarvisai.presentation.chat.components.MessageBubble
+import com.example.jarvisai.presentation.chat.components.ModelSelectionBottomSheet
 import com.example.jarvisai.ui.theme.JarvisAccentCyan
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
+import com.example.jarvisai.ui.theme.JarvisAccentOrange
 import com.example.jarvisai.ui.theme.JarvisAccentRed
 import com.example.jarvisai.ui.theme.JarvisBackground
 import com.example.jarvisai.ui.theme.JarvisBorder
@@ -245,7 +249,7 @@ fun ChatScreen(
                     if (!uiState.isModelLoaded) {
                         val currentModel = CloudAiModel.findById(uiState.selectedModelId)
                         NoModelLoadedBanner(
-                            providerName = if (currentModel.id == "local-llama-termux") "Local GGUF (Termux)" else currentModel.provider.displayName,
+                            providerName = if (currentModel.id == "local-llama-cpp") "llama.cpp Nativo (GGUF)" else currentModel.provider.displayName,
                             onLoadClick = onNavigateToModels
                         )
                     }
@@ -362,8 +366,24 @@ private fun ChatTopBar(
     onLiveModeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isDropdownExpanded by remember { mutableStateOf(false) }
+    var isModelSheetOpen by remember { mutableStateOf(false) }
     val currentModel = CloudAiModel.ALL_MODELS.firstOrNull { it.id == selectedModelId } ?: CloudAiModel.ALL_MODELS.first()
+
+    val brandColor = when (currentModel.provider) {
+        com.example.jarvisai.domain.model.ModelProvider.GEMINI -> Color(0xFF4285F4)
+        com.example.jarvisai.domain.model.ModelProvider.LOCAL_LLAMA -> Color(0xFF00E5FF)
+        com.example.jarvisai.domain.model.ModelProvider.OPENROUTER -> Color(0xFF8B5CF6)
+        com.example.jarvisai.domain.model.ModelProvider.OPENAI -> Color(0xFF10A37F)
+        com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> Color(0xFF0070F3)
+        com.example.jarvisai.domain.model.ModelProvider.GROQ -> Color(0xFFF55036)
+        com.example.jarvisai.domain.model.ModelProvider.ANTHROPIC -> Color(0xFFD97706)
+        com.example.jarvisai.domain.model.ModelProvider.CUSTOM_OPENAI -> Color(0xFF00B0FF)
+    }
+
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (isModelSheetOpen) 180f else 0f,
+        label = "arrow_rot"
+    )
 
     val infiniteTransition = rememberInfiniteTransition(label = "topbar_glow")
     val livePulse by infiniteTransition.animateFloat(
@@ -390,189 +410,86 @@ private fun ChatTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // High-Tech Model Selector Pill (Weighted to prevent overflow/squeezing other items)
-            Box(
+            // Futuristic High-Tech Model Selector Pill (Weighted to prevent overflow)
+            Surface(
+                onClick = { isModelSheetOpen = true },
+                shape = RoundedCornerShape(20.dp),
+                color = JarvisSurface,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isModelLoaded) JarvisBorderGlow else JarvisAccentOrange.copy(alpha = 0.6f)
+                ),
                 modifier = Modifier.weight(1f, fill = false)
             ) {
-                Surface(
-                    onClick = { isDropdownExpanded = true },
-                    shape = RoundedCornerShape(20.dp),
-                    color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (isModelLoaded) JarvisBorderGlow else JarvisAccentRed.copy(alpha = 0.5f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    // Pulsing LED indicator
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentOrange)
                     )
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+
+                    // Mini Provider Tag
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = brandColor.copy(alpha = 0.15f)
                     ) {
-                        // Online LED indicator
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentRed)
-                        )
-
-                        // Model Title with Ellipsis and Weight
                         Text(
-                            text = currentModel.name,
-                            color = JarvisTextPrimary,
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
+                            text = when (currentModel.provider) {
+                                com.example.jarvisai.domain.model.ModelProvider.LOCAL_LLAMA -> "GGUF"
+                                com.example.jarvisai.domain.model.ModelProvider.GEMINI -> "GEMINI"
+                                com.example.jarvisai.domain.model.ModelProvider.OPENAI -> "OPENAI"
+                                com.example.jarvisai.domain.model.ModelProvider.GROQ -> "GROQ"
+                                com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> "DEEPSEEK"
+                                com.example.jarvisai.domain.model.ModelProvider.ANTHROPIC -> "CLAUDE"
+                                com.example.jarvisai.domain.model.ModelProvider.OPENROUTER -> "ROUTER"
+                                else -> "AI"
+                            },
+                            color = brandColor,
+                            fontSize = 7.5.sp,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = "Desplegar modelos",
-                            tint = JarvisPrimary,
-                            modifier = Modifier.size(18.dp)
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
-                }
 
-                DropdownMenu(
-                    expanded = isDropdownExpanded,
-                    onDismissRequest = { isDropdownExpanded = false },
-                    modifier = Modifier
-                        .width(325.dp)
-                        .heightIn(max = 480.dp)
-                        .background(JarvisSurfaceElevated)
-                        .border(1.dp, JarvisBorder, RoundedCornerShape(12.dp))
-                ) {
-                    val groupedModels = CloudAiModel.ALL_MODELS.groupBy { it.provider }
-                    
-                    groupedModels.forEach { (provider, models) ->
-                        val brandColor = when (provider) {
-                            com.example.jarvisai.domain.model.ModelProvider.GEMINI -> Color(0xFF4285F4)
-                            com.example.jarvisai.domain.model.ModelProvider.OPENROUTER -> Color(0xFF651FFF)
-                            com.example.jarvisai.domain.model.ModelProvider.OPENAI -> Color(0xFF10A37F)
-                            com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> Color(0xFF0070F3)
-                            com.example.jarvisai.domain.model.ModelProvider.GROQ -> Color(0xFFF55036)
-                            com.example.jarvisai.domain.model.ModelProvider.ANTHROPIC -> Color(0xFFD97706)
-                            com.example.jarvisai.domain.model.ModelProvider.CUSTOM_OPENAI -> Color(0xFF00E5FF)
-                        }
-                        
-                        val providerIcon = when (provider) {
-                            com.example.jarvisai.domain.model.ModelProvider.GEMINI -> Icons.Default.AutoAwesome
-                            com.example.jarvisai.domain.model.ModelProvider.CUSTOM_OPENAI -> Icons.Default.Code
-                            com.example.jarvisai.domain.model.ModelProvider.GROQ -> Icons.Default.Lightbulb
-                            com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> Icons.Default.BubbleChart
-                            else -> Icons.Default.Settings
-                        }
+                    // Model Name with Ellipsis
+                    Text(
+                        text = currentModel.name,
+                        color = JarvisTextPrimary,
+                        fontSize = 11.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
 
-                        // Provider Header Category Indicator
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(brandColor.copy(alpha = 0.08f))
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = providerIcon,
-                                    contentDescription = null,
-                                    tint = brandColor,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Text(
-                                    text = provider.displayName.uppercase(),
-                                    color = brandColor,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 0.8.sp
-                                )
-                            }
-                        }
-
-                        models.forEach { model ->
-                            val isSelected = model.id == selectedModelId
-                            val isReady = isProviderReady(model.provider)
-                            
-                            DropdownMenuItem(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(if (isSelected) brandColor.copy(alpha = 0.06f) else Color.Transparent),
-                                text = {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.weight(1f).padding(end = 8.dp, top = 1.dp, bottom = 1.dp)
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                if (isSelected) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(6.dp)
-                                                            .clip(CircleShape)
-                                                            .background(brandColor)
-                                                    )
-                                                }
-                                                Text(
-                                                    text = model.name,
-                                                    color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                    fontSize = 12.5.sp,
-                                                    fontFamily = FontFamily.Monospace,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            Text(
-                                                text = model.description,
-                                                color = JarvisTextSecondary,
-                                                fontSize = 10.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = if (isSelected) Modifier.padding(start = 12.dp) else Modifier
-                                            )
-                                        }
-
-                                        // Status glow pill
-                                        Surface(
-                                            color = if (isReady) brandColor.copy(alpha = 0.12f) else Color(0x15FF5252),
-                                            shape = RoundedCornerShape(4.dp),
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                1.dp,
-                                                if (isReady) brandColor.copy(alpha = 0.4f) else Color(0x35FF5252)
-                                            )
-                                        ) {
-                                            Text(
-                                                text = if (isReady) "Listo" else "Sin Key",
-                                                color = if (isReady) brandColor else Color(0xFFFF8A80),
-                                                fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    onModelSelected(model.id)
-                                    isDropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Abrir selector de modelos",
+                        tint = JarvisPrimary,
+                        modifier = Modifier
+                            .size(17.dp)
+                            .rotate(arrowRotation)
+                    )
                 }
             }
+
+            // Bottom sheet modal for organized, stylish model management
+            ModelSelectionBottomSheet(
+                isOpen = isModelSheetOpen,
+                onDismiss = { isModelSheetOpen = false },
+                selectedModelId = selectedModelId,
+                onModelSelected = onModelSelected,
+                isProviderReady = isProviderReady,
+                onConfigureKeysClick = onModelsClick
+            )
 
             // Tactical Action Icons Cluster
             Row(
@@ -777,17 +694,19 @@ private fun NoModelLoadedBanner(
     onLoadClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isLocal = providerName.contains("llama", ignoreCase = true) || providerName.contains("GGUF", ignoreCase = true)
+
     Surface(
         onClick = onLoadClick,
         shape = RoundedCornerShape(12.dp),
-        color = Color(0xFF1F1215),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8A242E)),
+        color = Color(0xFF1E1417),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7A2530)),
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -798,7 +717,7 @@ private fun NoModelLoadedBanner(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(30.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF381419)),
                     contentAlignment = Alignment.Center
@@ -807,21 +726,21 @@ private fun NoModelLoadedBanner(
                         imageVector = Icons.Default.Warning,
                         contentDescription = null,
                         tint = Color(0xFFFF8A80),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
                 Column {
                     Text(
-                        text = "Falta API Key de $providerName",
+                        text = if (isLocal) "Modelo Local GGUF sin iniciar" else "Falta Clave API de $providerName",
                         color = Color(0xFFFF8A80),
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = "Configura tu llave o selecciona Gemini para continuar",
+                        text = if (isLocal) "Carga el modelo GGUF en memoria desde Ajustes" else "Configura tu clave o pulsa para elegir otro modelo",
                         color = JarvisTextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 10.sp
                     )
                 }
             }
@@ -836,10 +755,10 @@ private fun NoModelLoadedBanner(
                 Text(
                     text = "CONFIGURAR",
                     color = Color(0xFFFF8A80),
-                    fontSize = 10.sp,
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                 )
             }
         }

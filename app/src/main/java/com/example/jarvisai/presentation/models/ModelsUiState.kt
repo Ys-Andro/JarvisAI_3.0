@@ -12,6 +12,9 @@ data class ModelsUiState(
     val isValidatingApiKey: Boolean = false,
     val settings: GenerationSettings = GenerationSettings(),
     val appTheme: AppThemeMode = AppThemeMode.DARK_JARVIS,
+    val selectedPresetId: String = "llama3_2_1b",
+    val isBenchmarking: Boolean = false,
+    val benchmarkResult: String? = null,
     val statusMessage: String? = null,
     val errorMessage: String? = null
 )
