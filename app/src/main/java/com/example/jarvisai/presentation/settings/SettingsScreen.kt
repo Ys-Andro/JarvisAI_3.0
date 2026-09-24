@@ -77,9 +77,11 @@ import com.example.jarvisai.presentation.settings.components.VoiceSettingsSectio
 import com.example.jarvisai.ui.theme.JarvisAccentCyan
 import com.example.jarvisai.ui.theme.JarvisAccentGold
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
+import com.example.jarvisai.ui.theme.JarvisAccentOrange
 import com.example.jarvisai.ui.theme.JarvisAccentRed
 import com.example.jarvisai.ui.theme.JarvisBackground
 import com.example.jarvisai.ui.theme.JarvisBorder
+import com.example.jarvisai.ui.theme.JarvisBorderSubtle
 import com.example.jarvisai.ui.theme.JarvisPrimary
 import com.example.jarvisai.ui.theme.JarvisPrimaryLight
 import com.example.jarvisai.ui.theme.JarvisSurface
@@ -501,6 +503,47 @@ fun SettingsScreen(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
+                                                // RAM Hardware Diagnostics Badge
+                                                val context = androidx.compose.ui.platform.LocalContext.current
+                                                val ramInfo = remember(localLlmLoaded, localLlmDownloaded) {
+                                                    com.example.jarvisai.data.util.LocalLlmManager.getDeviceRamInfo(context)
+                                                }
+                                                val isLowRam = ramInfo.availableRamMb < 1200
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = if (isLowRam) JarvisAccentOrange.copy(alpha = 0.10f) else JarvisSurfaceVariant.copy(alpha = 0.5f),
+                                                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isLowRam) JarvisAccentOrange.copy(alpha = 0.4f) else JarvisBorderSubtle),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = "DIAGNÓSTICO MEMORIA RAM",
+                                                                color = if (isLowRam) JarvisAccentOrange else JarvisAccentCyan,
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                            Text(
+                                                                text = "${ramInfo.availableRamMb} MB Libres / ${ramInfo.totalRamMb} MB",
+                                                                color = if (isLowRam) JarvisAccentOrange else JarvisAccentGreen,
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = if (isLowRam) "Memoria ajustada: Para evitar cierres del sistema (OOM), usa modelos ligeros de 200MB a 500MB (ej. SmolLM2 o Qwen)." else "Capacidad adecuada para modelos compactos de 400MB a 800MB.",
+                                                            color = JarvisTextSecondary,
+                                                            fontSize = 8.5.sp
+                                                        )
+                                                    }
+                                                }
+
                                                 // Download selected preset button
                                                 Surface(
                                                     onClick = { viewModel.downloadLocalLlm() },
@@ -645,6 +688,28 @@ fun SettingsScreen(
                                                             fontSize = 9.sp,
                                                             fontFamily = FontFamily.Monospace,
                                                             modifier = Modifier.padding(horizontal = 4.dp)
+                                                        )
+                                                    }
+                                                }
+
+                                                // Emergency Reset / Cleanup Button
+                                                Surface(
+                                                    onClick = { viewModel.emergencyResetLocalModel() },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = JarvisSurfaceVariant.copy(alpha = 0.3f),
+                                                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorderSubtle),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier.padding(vertical = 7.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "PURGAR ARCHIVOS GGUF (RESET DE SEGURIDAD)",
+                                                            color = JarvisTextSecondary,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            fontFamily = FontFamily.Monospace
                                                         )
                                                     }
                                                 }

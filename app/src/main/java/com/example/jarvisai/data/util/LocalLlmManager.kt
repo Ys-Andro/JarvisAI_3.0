@@ -93,6 +93,9 @@ object LocalLlmManager {
     )
 
     private const val ACTIVE_MODEL_FILE_NAME = "active_model.gguf"
+    private const val PREFS_NAME = "jarvis_local_llm_safety"
+    private const val KEY_GGUF_LOAD_IN_PROGRESS = "gguf_load_in_progress"
+    private const val KEY_SAFE_MODE_TRIGGERED = "safe_mode_triggered"
 
     private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -131,6 +134,59 @@ object LocalLlmManager {
 
     private var activeModelPath: String? = null
 
+    data class DeviceRamInfo(
+        val availableRamMb: Long,
+        val totalRamMb: Long,
+        val isLowMemory: Boolean
+    )
+
+    fun getDeviceRamInfo(context: Context): DeviceRamInfo {
+        return try {
+            val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            val memInfo = android.app.ActivityManager.MemoryInfo()
+            actManager?.getMemoryInfo(memInfo)
+            val availMb = memInfo.availMem / (1024 * 1024)
+            val totalMb = memInfo.totalMem / (1024 * 1024)
+            DeviceRamInfo(availMb, totalMb, memInfo.lowMemory)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking RAM info", e)
+            DeviceRamInfo(1024, 2048, false)
+        }
+    }
+
+    /**
+     * Startup Safety Sentinel:
+     * Checks if a previous model load resulted in an abnormal process termination (crash or OOM kill).
+     * If so, quarantines the model file to break the crash loop and allow the user to open the app safely.
+     */
+    fun checkStartupSafety(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val wasLoading = prefs.getBoolean(KEY_GGUF_LOAD_IN_PROGRESS, false)
+        if (wasLoading) {
+            // App was killed by OS / crashed during GGUF loading
+            prefs.edit()
+                .putBoolean(KEY_GGUF_LOAD_IN_PROGRESS, false)
+                .putBoolean(KEY_SAFE_MODE_TRIGGERED, true)
+                .commit()
+
+            val modelFile = getModelFile(context)
+            if (modelFile.exists()) {
+                val fileSizeMb = modelFile.length() / (1024 * 1024)
+                val quarantined = File(context.filesDir, "quarantined_heavy_model.gguf")
+                if (quarantined.exists()) quarantined.delete()
+                modelFile.renameTo(quarantined)
+
+                _isModelLoaded.value = false
+                _isModelDownloaded.value = false
+                _loadedModelName.value = "Ninguno"
+                _engineDiagnostics.value = "⚠️ Modo Seguro: Modelo pesado desactivado tras cierre forzado."
+
+                return "⚠️ RECUPERACIÓN DE SEGURIDAD J.A.R.V.I.S.:\nEl modelo GGUF ($fileSizeMb MB) causó un cierre forzado por sobrecarga de memoria RAM. Ha sido aislado automáticamente para que puedas ingresar a la app sin bloqueos."
+            }
+        }
+        return null
+    }
+
     fun getModelFile(context: Context): File {
         return File(context.filesDir, ACTIVE_MODEL_FILE_NAME)
     }
@@ -146,14 +202,25 @@ object LocalLlmManager {
     }
 
     /**
-     * Validates if a given Uri is an authentic GGUF file using the native magic bytes header.
+     * Validates if a given Uri is an authentic GGUF file using pure Kotlin byte inspection.
+     * Checks the 4-byte magic signature 'G' 'G' 'U' 'F' without calling JNI, preventing native crashes.
      */
     fun isValidGguf(context: Context, uri: Uri): Boolean {
         return try {
-            val engine = llamaAndroid ?: LlamaAndroid(context.contentResolver).also { llamaAndroid = it }
-            engine.isGGUF(uri)
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val header = ByteArray(4)
+                val read = stream.read(header)
+                if (read == 4) {
+                    header[0] == 0x47.toByte() && // 'G'
+                    header[1] == 0x47.toByte() && // 'G'
+                    header[2] == 0x55.toByte() && // 'U'
+                    header[3] == 0x46.toByte()    // 'F'
+                } else {
+                    false
+                }
+            } ?: false
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking GGUF signature", e)
+            Log.e(TAG, "Error checking GGUF signature in stream", e)
             false
         }
     }
@@ -253,24 +320,43 @@ object LocalLlmManager {
 
     /**
      * Initializes the native llama.cpp engine and loads the active GGUF model into memory.
+     * Incorporates strict RAM safety checks, crash loop prevention markers, and adaptive context allocation.
      */
     suspend fun initLlmInference(context: Context, customPathOrUri: String? = null): Boolean = withContext(Dispatchers.IO) {
         if (_isModelLoaded.value && llamaHelper != null) return@withContext true
 
         val modelFile = getModelFile(context)
-        val targetPath = customPathOrUri ?: if (modelFile.exists()) {
-            Uri.fromFile(modelFile).toString()
-        } else {
+        if (!modelFile.exists() && customPathOrUri == null) {
+            _engineDiagnostics.value = "No se encontró ningún archivo de modelo GGUF en almacenamiento."
             return@withContext false
         }
+
+        // Memory Safety Guard: Check device RAM before allocating native tensors
+        val ramInfo = getDeviceRamInfo(context)
+        val fileSizeMb = if (modelFile.exists()) modelFile.length() / (1024 * 1024) else 0L
+        if (fileSizeMb > 0 && fileSizeMb > (ramInfo.availableRamMb * 0.92)) {
+            val errorMsg = "Memoria RAM insuficiente (${ramInfo.availableRamMb} MB libres). El modelo (${fileSizeMb} MB) superaría el límite de seguridad y provocaría el cierre de la app."
+            Log.e(TAG, errorMsg)
+            _isModelLoaded.value = false
+            _isInitializing.value = false
+            _engineDiagnostics.value = "⚠️ $errorMsg"
+            return@withContext false
+        }
+
+        val targetPath = customPathOrUri ?: Uri.fromFile(modelFile).toString()
+
+        // Set Crash Sentinel flag synchronously before native code executes
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_GGUF_LOAD_IN_PROGRESS, true).commit()
 
         _isInitializing.value = true
         _engineDiagnostics.value = "Iniciando carga de pesos GGUF en memoria (librnllama)..."
 
+        var helper: LlamaHelper? = null
         try {
             // Instantiate native helper
             llamaAndroid = LlamaAndroid(context.contentResolver)
-            val helper = LlamaHelper(
+            helper = LlamaHelper(
                 contentResolver = context.contentResolver,
                 scope = managerScope,
                 sharedFlow = llmEvents
@@ -296,44 +382,55 @@ object LocalLlmManager {
                 }
             }
 
-            // Trigger load with standard 2048 context window
+            // Adapt context window dynamically: 1024 tokens for constrained devices to save KV cache RAM
+            val adaptiveContext = if (ramInfo.availableRamMb < 1800) 1024 else 2048
+
             helper.load(
                 path = targetPath,
-                contextLength = 2048,
+                contextLength = adaptiveContext,
                 mmprojPath = null,
                 loaded = { ptr ->
                     Log.d(TAG, "Native context pointer allocated: $ptr")
-                    loadSuccess = true
+                    if (ptr != 0L) {
+                        loadSuccess = true
+                    }
                 }
             )
 
-            // Wait briefly for engine initialization
+            // Wait with a 20s timeout for engine initialization
             val startTime = System.currentTimeMillis()
-            while (!loadSuccess && loadError == null && (System.currentTimeMillis() - startTime) < 15000) {
+            while (!loadSuccess && loadError == null && (System.currentTimeMillis() - startTime) < 20000) {
                 kotlinx.coroutines.delay(100)
             }
             loadJob.cancel()
 
-            if (loadSuccess || loadError == null) {
+            // Clear crash sentinel flag once load finishes
+            prefs.edit().putBoolean(KEY_GGUF_LOAD_IN_PROGRESS, false).commit()
+
+            if (loadSuccess && loadError == null) {
                 llamaHelper = helper
                 activeModelPath = targetPath
                 _isModelLoaded.value = true
                 _isInitializing.value = false
-                _engineDiagnostics.value = "✓ llama.cpp Activo en RAM | Aceleración CPU NEON/DotProd"
+                _engineDiagnostics.value = "✓ llama.cpp Activo en RAM | Contexto: ${adaptiveContext} tok | CPU Acelerada"
                 Log.d(TAG, "Native llama.cpp engine successfully ready.")
                 return@withContext true
             } else {
                 Log.e(TAG, "Failed loading model: $loadError")
+                try { helper.release() } catch (_: Throwable) {}
                 _isModelLoaded.value = false
                 _isInitializing.value = false
-                _engineDiagnostics.value = "Error al cargar GGUF: $loadError"
+                _engineDiagnostics.value = "Error al cargar GGUF: ${loadError ?: "Tiempo de espera agotado"}"
                 return@withContext false
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Exception initializing native llama.cpp", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Exception initializing native llama.cpp", t)
+            prefs.edit().putBoolean(KEY_GGUF_LOAD_IN_PROGRESS, false).commit()
+            try { helper?.release() } catch (_: Throwable) {}
+            llamaHelper = null
             _isModelLoaded.value = false
             _isInitializing.value = false
-            _engineDiagnostics.value = "Excepción nativa: ${e.message}"
+            _engineDiagnostics.value = "Fallo de inicialización: ${t.localizedMessage ?: t.javaClass.simpleName}"
             return@withContext false
         }
     }
@@ -420,35 +517,49 @@ object LocalLlmManager {
     }
 
     /**
-     * Imports a user-selected GGUF file from SAF into the app's internal files directory.
+     * Safely imports a user-selected GGUF file from SAF into the app's internal files directory.
+     * Uses atomic file renaming within internal storage and verifies storage integrity.
      */
     suspend fun importGgufFromUri(context: Context, uri: Uri): Boolean = withContext(Dispatchers.IO) {
+        val targetFile = getModelFile(context)
+        val tempFile = File(context.filesDir, "imported_model.tmp")
         try {
-            val targetFile = getModelFile(context)
-            val tempFile = File(context.cacheDir, "imported_model.tmp")
             if (tempFile.exists()) tempFile.delete()
 
             val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext false
             val outputStream = FileOutputStream(tempFile)
-            val buffer = ByteArray(131072) // 128KB fast stream buffer
+            val buffer = ByteArray(262144) // 256KB buffer for efficient file transfer
             var bytesRead: Int
 
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                 outputStream.write(buffer, 0, bytesRead)
             }
             outputStream.flush()
+            outputStream.fd.sync()
             outputStream.close()
             inputStream.close()
 
-            if (targetFile.exists()) targetFile.delete()
-            tempFile.renameTo(targetFile)
+            // Unload old model from memory if currently running
+            unloadModel()
 
-            _loadedModelName.value = "Modelo GGUF Importado (${targetFile.length() / (1024 * 1024)} MB)"
+            if (targetFile.exists()) targetFile.delete()
+            val renamed = tempFile.renameTo(targetFile)
+            if (!renamed) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                tempFile.delete()
+            }
+
+            val sizeMb = targetFile.length() / (1024 * 1024)
+            _loadedModelName.value = "Modelo GGUF Importado ($sizeMb MB)"
             _isModelDownloaded.value = true
+            _engineDiagnostics.value = "Archivo GGUF guardado ($sizeMb MB). Pulsa 'Cargar en RAM' para activarlo."
             return@withContext true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error importing GGUF file from URI", e)
-            false
+        } catch (t: Throwable) {
+            Log.e(TAG, "Error importing GGUF file from URI", t)
+            if (tempFile.exists()) {
+                try { tempFile.delete() } catch (_: Throwable) {}
+            }
+            return@withContext false
         }
     }
 
@@ -474,10 +585,50 @@ object LocalLlmManager {
     fun deleteModel(context: Context): Boolean {
         unloadModel()
         val file = getModelFile(context)
+        val quarantined = File(context.filesDir, "quarantined_heavy_model.gguf")
+        if (quarantined.exists()) {
+            try { quarantined.delete() } catch (_: Throwable) {}
+        }
+        val tempFile = File(context.filesDir, "imported_model.tmp")
+        if (tempFile.exists()) {
+            try { tempFile.delete() } catch (_: Throwable) {}
+        }
         val deleted = if (file.exists()) file.delete() else false
         _isModelDownloaded.value = false
+        _isModelLoaded.value = false
         _loadedModelName.value = "Ninguno"
-        _engineDiagnostics.value = "Archivo GGUF eliminado del dispositivo."
+        _engineDiagnostics.value = "Archivo GGUF eliminado del almacenamiento del dispositivo."
         return deleted
+    }
+
+    /**
+     * Emergency Reset: Purges all local model files, cache, and safety flags.
+     */
+    fun resetAllLocalModelFiles(context: Context): Boolean {
+        unloadModel()
+        var anyDeleted = false
+        val filesToDelete = listOf(
+            getModelFile(context),
+            File(context.filesDir, "quarantined_heavy_model.gguf"),
+            File(context.filesDir, "imported_model.tmp"),
+            File(context.cacheDir, "$ACTIVE_MODEL_FILE_NAME.tmp"),
+            File(context.cacheDir, "imported_model.tmp")
+        )
+        for (f in filesToDelete) {
+            if (f.exists()) {
+                try {
+                    f.delete()
+                    anyDeleted = true
+                } catch (_: Throwable) {}
+            }
+        }
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+
+        _isModelDownloaded.value = false
+        _isModelLoaded.value = false
+        _loadedModelName.value = "Ninguno"
+        _engineDiagnostics.value = "Todos los archivos GGUF locales han sido purgados y reseteados."
+        return anyDeleted
     }
 }

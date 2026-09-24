@@ -49,11 +49,14 @@ class ModelsViewModel(
         observeProviderApiKeys()
         observeSelectedAgent()
         
-        // Auto-initialize local LLM in background if downloaded
+        // Check startup safety (quarantine problematic models if a prior crash occurred)
+        // and check existence WITHOUT auto-loading heavy weights into RAM on app launch
         viewModelScope.launch {
-            if (com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)) {
-                com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+            val safetyAlert = com.example.jarvisai.data.util.LocalLlmManager.checkStartupSafety(context)
+            if (safetyAlert != null) {
+                _uiState.update { it.copy(statusMessage = safetyAlert) }
             }
+            com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)
         }
     }
 
@@ -65,15 +68,15 @@ class ModelsViewModel(
         val targetPresetId = presetId ?: _uiState.value.selectedPresetId
         val preset = presetGgufModels.find { it.id == targetPresetId } ?: presetGgufModels.first()
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Iniciando descarga de ${preset.name} (${preset.sizeFormatted}), por favor no cierre la app...") }
+            _uiState.update { it.copy(statusMessage = "Iniciando descarga de ${preset.name} (${preset.sizeFormatted}), por favor no cierre la app...", errorMessage = null) }
             val success = com.example.jarvisai.data.util.LocalLlmManager.downloadModel(context, preset.id)
             if (success) {
-                _uiState.update { it.copy(statusMessage = "¡${preset.name} descargado con éxito! Inicializando motor nativo llama.cpp...") }
-                val initSuccess = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
-                if (initSuccess) {
-                    _uiState.update { it.copy(statusMessage = "¡J.A.R.V.I.S. llama.cpp activo y listo para operar en RAM! 🧠") }
-                } else {
-                    _uiState.update { it.copy(errorMessage = "Modelo GGUF descargado, pero falló la carga en RAM.") }
+                com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)
+                _uiState.update {
+                    it.copy(
+                        statusMessage = "¡${preset.name} guardado con éxito en el dispositivo! Pulsa 'CARGAR EN RAM' cuando desees activarlo para inferencia offline.",
+                        errorMessage = null
+                    )
                 }
             } else {
                 _uiState.update { it.copy(errorMessage = "Error en la descarga del modelo GGUF. Verifique su conexión.") }
@@ -84,19 +87,41 @@ class ModelsViewModel(
     fun deleteLocalLlm() {
         val deleted = com.example.jarvisai.data.util.LocalLlmManager.deleteModel(context)
         if (deleted) {
-            _uiState.update { it.copy(statusMessage = "Modelo GGUF eliminado del almacenamiento del dispositivo.") }
+            _uiState.update { it.copy(statusMessage = "Modelo GGUF eliminado del almacenamiento del dispositivo.", errorMessage = null) }
         } else {
             _uiState.update { it.copy(statusMessage = "No se encontró ningún archivo de modelo para eliminar.") }
         }
     }
 
+    fun emergencyResetLocalModel() {
+        val deleted = com.example.jarvisai.data.util.LocalLlmManager.resetAllLocalModelFiles(context)
+        if (deleted) {
+            _uiState.update { it.copy(statusMessage = "✓ Todos los archivos GGUF locales y temporales han sido eliminados de forma segura.", errorMessage = null) }
+        } else {
+            _uiState.update { it.copy(statusMessage = "No había archivos de modelo local que limpiar.", errorMessage = null) }
+        }
+    }
+
     fun initializeLocalLlm() {
         viewModelScope.launch {
+            val ramInfo = com.example.jarvisai.data.util.LocalLlmManager.getDeviceRamInfo(context)
+            val modelFile = com.example.jarvisai.data.util.LocalLlmManager.getModelFile(context)
+            val modelSizeMb = if (modelFile.exists()) modelFile.length() / (1024 * 1024) else 0L
+
+            if (modelSizeMb > 0 && modelSizeMb > (ramInfo.availableRamMb * 0.9)) {
+                _uiState.update {
+                    it.copy(
+                        errorMessage = "⚠️ Advertencia de RAM: El modelo pesa ${modelSizeMb} MB pero solo hay ${ramInfo.availableRamMb} MB libres. El sistema podría cerrarlo por falta de memoria (OOM)."
+                    )
+                }
+            }
+
+            _uiState.update { it.copy(statusMessage = "Cargando modelo GGUF en memoria RAM con protección activa...", errorMessage = null) }
             val initialized = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
             if (initialized) {
-                _uiState.update { it.copy(statusMessage = "Motor nativo llama.cpp cargado exitosamente en RAM.") }
+                _uiState.update { it.copy(statusMessage = "¡Motor nativo llama.cpp cargado exitosamente en RAM! Listo para operar offline.", errorMessage = null) }
             } else {
-                _uiState.update { it.copy(errorMessage = "No se pudo cargar el modelo GGUF en memoria. Verifique que exista.") }
+                _uiState.update { it.copy(errorMessage = "No se pudo cargar el modelo GGUF en RAM. Es posible que el modelo sea demasiado pesado para la memoria libre de este dispositivo o su cuantización no sea compatible.") }
             }
         }
     }
@@ -362,8 +387,9 @@ class ModelsViewModel(
 
     fun copySelectedModelFile(uri: android.net.Uri) {
         viewModelScope.launch {
-            // Get original file name
+            // Get original file name and size safely
             var fileName = "modelo.gguf"
+            var fileSizeBytes: Long = 0
             try {
                 val cursor = context.contentResolver.query(uri, null, null, null, null)
                 cursor?.use {
@@ -372,32 +398,56 @@ class ModelsViewModel(
                         if (nameIndex != -1) {
                             fileName = it.getString(nameIndex) ?: "modelo.gguf"
                         }
+                        val sizeIndex = it.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                        if (sizeIndex != -1) {
+                            fileSizeBytes = it.getLong(sizeIndex)
+                        }
                     }
                 }
             } catch (e: Exception) {
-                Log.e("ModelsViewModel", "Error reading file name", e)
+                Log.e("ModelsViewModel", "Error reading file metadata", e)
             }
 
-            _uiState.update { it.copy(statusMessage = "Validando e importando modelo GGUF ($fileName)...") }
+            val fileSizeMb = if (fileSizeBytes > 0) fileSizeBytes / (1024 * 1024) else 0L
+
+            _uiState.update { it.copy(statusMessage = "Comprobando formato del archivo ($fileName)...", errorMessage = null) }
+
+            // 1. Safe pure-Kotlin header validation (no native JNI crash risk)
             val isGguf = com.example.jarvisai.data.util.LocalLlmManager.isValidGguf(context, uri)
             if (!isGguf && !fileName.lowercase().endsWith(".gguf")) {
-                _uiState.update { it.copy(errorMessage = "El archivo seleccionado no parece ser un modelo GGUF válido para llama.cpp.") }
+                _uiState.update { it.copy(errorMessage = "El archivo '$fileName' no posee una firma GGUF válida reconocida por llama.cpp.") }
                 return@launch
             }
 
+            // 2. Check internal storage free space
+            val freeSpace = context.filesDir.usableSpace
+            if (fileSizeBytes > 0 && freeSpace < (fileSizeBytes + 150 * 1024 * 1024)) {
+                _uiState.update {
+                    it.copy(errorMessage = "Espacio de almacenamiento insuficiente. Se requieren al menos ${fileSizeMb + 150} MB libres en el dispositivo.")
+                }
+                return@launch
+            }
+
+            // 3. Check device RAM
+            val ramInfo = com.example.jarvisai.data.util.LocalLlmManager.getDeviceRamInfo(context)
+            val ramNotice = if (fileSizeMb > 0 && fileSizeMb > (ramInfo.availableRamMb * 0.75)) {
+                "\n\n⚠️ Nota de Rendimiento: Tu dispositivo cuenta con ${ramInfo.availableRamMb} MB de RAM libre y este modelo pesa ${fileSizeMb} MB. Si el sistema llegara a cerrarse al cargarlo, el Modo Seguro de J.A.R.V.I.S. lo desactivará automáticamente para que puedas ingresar normalmente."
+            } else ""
+
+            _uiState.update { it.copy(statusMessage = "Guardando archivo GGUF ($fileName - ${if (fileSizeMb > 0) "$fileSizeMb MB" else "almacenamiento"})...") }
+
             val success = com.example.jarvisai.data.util.LocalLlmManager.importGgufFromUri(context, uri)
-            
+
             if (success) {
                 com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)
-                _uiState.update { it.copy(statusMessage = "¡Modelo GGUF importado con éxito! Inicializando motor nativo en RAM...") }
-                val initialized = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
-                if (initialized) {
-                    _uiState.update { it.copy(statusMessage = "¡Motor llama.cpp activo y listo con $fileName! 🧠") }
-                } else {
-                    _uiState.update { it.copy(errorMessage = "Modelo importado, pero falló la carga en memoria RAM.") }
+                _uiState.update {
+                    it.copy(
+                        statusMessage = "✓ ¡Modelo GGUF '$fileName' guardado correctamente en almacenamiento local!$ramNotice\n\nPulsa 'CARGAR EN RAM' para activar el motor de inferencia cuando desees.",
+                        errorMessage = null
+                    )
                 }
             } else {
-                _uiState.update { it.copy(errorMessage = "Error al copiar el archivo GGUF. Asegúrese de tener espacio libre suficiente.") }
+                _uiState.update { it.copy(errorMessage = "Error al copiar el archivo GGUF. Verifica que tengas suficiente almacenamiento interno disponible.") }
             }
         }
     }
