@@ -101,6 +101,14 @@ fun SettingsScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
+    val filePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.copySelectedModelFile(uri)
+        }
+    }
+
     // Local LLM States
     val localLlmDownloading by viewModel.localLlmDownloading.collectAsState()
     val localLlmProgress by viewModel.localLlmProgress.collectAsState()
@@ -389,17 +397,17 @@ fun SettingsScreen(
                                                 }
                                             }
                                         } else {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                if (!localLlmDownloaded) {
+                                            if (!localLlmDownloaded) {
+                                                Column(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
                                                     Surface(
                                                         onClick = { viewModel.downloadLocalLlm() },
                                                         shape = RoundedCornerShape(8.dp),
                                                         color = JarvisAccentCyan.copy(alpha = 0.12f),
                                                         border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentCyan),
-                                                        modifier = Modifier.weight(1f)
+                                                        modifier = Modifier.fillMaxWidth()
                                                     ) {
                                                         Box(
                                                             modifier = Modifier.padding(vertical = 10.dp),
@@ -414,7 +422,33 @@ fun SettingsScreen(
                                                             )
                                                         }
                                                     }
-                                                } else {
+
+                                                    Surface(
+                                                        onClick = { filePickerLauncher.launch("*/*") },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = JarvisAccentGreen.copy(alpha = 0.12f),
+                                                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentGreen),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier.padding(vertical = 10.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "IMPORTAR ARCHIVO MANUAL (.BIN / .GGUF)",
+                                                                color = JarvisAccentGreen,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
                                                     // Downloaded, show Initialize & Delete buttons
                                                     if (!localLlmLoaded) {
                                                         Surface(

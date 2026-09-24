@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ModelsViewModel(
     private val settingsRepository: ISettingsRepository,
@@ -307,5 +309,45 @@ class ModelsViewModel(
 
     fun dismissMessage() {
         _uiState.update { it.copy(statusMessage = null, errorMessage = null) }
+    }
+
+    fun copySelectedModelFile(uri: android.net.Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(statusMessage = "Copiando archivo de modelo al almacenamiento seguro de J.A.R.V.I.S...") }
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext false
+                    val targetFile = com.example.jarvisai.data.util.LocalLlmManager.getModelFile(context)
+                    val tempFile = java.io.File(context.cacheDir, "copied_model.tmp")
+                    if (tempFile.exists()) tempFile.delete()
+                    
+                    val outputStream = java.io.FileOutputStream(tempFile)
+                    val buffer = ByteArray(65536) // 64KB fast copying buffer
+                    var bytesRead: Int
+                    
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        outputStream.write(buffer, 0, bytesRead)
+                    }
+                    outputStream.flush()
+                    outputStream.close()
+                    inputStream.close()
+                    
+                    if (targetFile.exists()) targetFile.delete()
+                    tempFile.renameTo(targetFile)
+                    true
+                } catch (e: Exception) {
+                    Log.e("ModelsViewModel", "Error copying manually selected model", e)
+                    false
+                }
+            }
+            
+            if (success) {
+                com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)
+                _uiState.update { it.copy(statusMessage = "¡Modelo local copiado con éxito! Ya puedes cargarlo en RAM.") }
+                com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
+            } else {
+                _uiState.update { it.copy(errorMessage = "Error al copiar el archivo. Asegúrese de tener espacio libre suficiente.") }
+            }
+        }
     }
 }
