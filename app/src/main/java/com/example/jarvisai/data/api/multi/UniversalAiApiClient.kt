@@ -82,7 +82,7 @@ class UniversalAiApiClient(
             else -> {
                 // OpenAI, DeepSeek, Groq, Custom OpenAI-compatible
                 val baseUrl = if (model.id == "local-llama-termux") {
-                    "http://127.0.0.1:8080"
+                    "http://127.0.0.1:8080/v1"
                 } else if (!customBaseUrl.isNullOrBlank()) {
                     customBaseUrl.trimEnd('/')
                 } else {
