@@ -245,7 +245,7 @@ fun ChatScreen(
                     if (!uiState.isModelLoaded) {
                         val currentModel = CloudAiModel.findById(uiState.selectedModelId)
                         NoModelLoadedBanner(
-                            providerName = currentModel.provider.displayName,
+                            providerName = if (currentModel.id == "local-llama-termux") "Local GGUF (Termux)" else currentModel.provider.displayName,
                             onLoadClick = onNavigateToModels
                         )
                     }

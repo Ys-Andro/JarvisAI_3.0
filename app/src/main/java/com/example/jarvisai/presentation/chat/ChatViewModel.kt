@@ -180,7 +180,7 @@ class ChatViewModel(
                 it.copy(
                     selectedModelId = modelId,
                     isModelLoaded = isReady,
-                    errorMessage = if (!isReady) "Falta la API Key de ${modelDef.provider.displayName}. Configúrala en Ajustes o selecciona Google Gemini." else null
+                    errorMessage = if (!isReady) "Falta la API Key de ${if (modelDef.id == "local-llama-termux") "Local GGUF (Termux)" else modelDef.provider.displayName}. Configúrala en Ajustes o selecciona Google Gemini." else null
                 )
             }
         }

@@ -170,6 +170,7 @@ class ModelsViewModel(
             "deepseek" -> trimmed.startsWith("sk-") && trimmed.length >= 20
             "groq" -> trimmed.startsWith("gsk_") && trimmed.length >= 20
             "anthropic" -> trimmed.startsWith("sk-ant-") && trimmed.length >= 20
+            "custom" -> trimmed.length >= 3
             else -> trimmed.length >= 10
         }
         val message = if (isValid) "¡Clave API de $providerId válida y verificada! ✓" else "Formato de clave inválido para $providerId ❌"

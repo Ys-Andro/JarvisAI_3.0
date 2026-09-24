@@ -30,6 +30,7 @@ class AppPreferences(private val context: Context) {
         val DEEPSEEK_API_KEY = stringPreferencesKey("deepseek_api_key")
         val GROQ_API_KEY = stringPreferencesKey("groq_api_key")
         val ANTHROPIC_API_KEY = stringPreferencesKey("anthropic_api_key")
+        val CUSTOM_API_KEY = stringPreferencesKey("custom_api_key")
         val CUSTOM_OPENAI_ENDPOINT = stringPreferencesKey("custom_openai_endpoint")
         val SELECTED_GEMINI_MODEL = stringPreferencesKey("selected_gemini_model")
         val TEMPERATURE = floatPreferencesKey("temperature")
@@ -68,6 +69,7 @@ class AppPreferences(private val context: Context) {
             "deepseek" -> preferences[Keys.DEEPSEEK_API_KEY]
             "groq" -> preferences[Keys.GROQ_API_KEY]
             "anthropic" -> preferences[Keys.ANTHROPIC_API_KEY]
+            "custom" -> preferences[Keys.CUSTOM_API_KEY]
             else -> preferences[Keys.GEMINI_API_KEY]
         }
     }
@@ -84,6 +86,7 @@ class AppPreferences(private val context: Context) {
             preferences[Keys.DEEPSEEK_API_KEY]?.let { put("deepseek", it) }
             preferences[Keys.GROQ_API_KEY]?.let { put("groq", it) }
             preferences[Keys.ANTHROPIC_API_KEY]?.let { put("anthropic", it) }
+            preferences[Keys.CUSTOM_API_KEY]?.let { put("custom", it) }
         }
     }
 
@@ -186,6 +189,7 @@ class AppPreferences(private val context: Context) {
                 "deepseek" -> Keys.DEEPSEEK_API_KEY
                 "groq" -> Keys.GROQ_API_KEY
                 "anthropic" -> Keys.ANTHROPIC_API_KEY
+                "custom" -> Keys.CUSTOM_API_KEY
                 else -> Keys.GEMINI_API_KEY
             }
             if (apiKey.isBlank()) {
