@@ -135,7 +135,7 @@ class ChatViewModel(
                 settingsRepository.getApiKey()
             ) { selectedModelId, providerKeys, generalApiKey ->
                 val modelDef = CloudAiModel.findById(selectedModelId)
-                val isReady = isProviderConfigured(modelDef.provider, providerKeys, generalApiKey)
+                val isReady = if (modelDef.id == "local-llama-termux") true else isProviderConfigured(modelDef.provider, providerKeys, generalApiKey)
                 Triple(selectedModelId, providerKeys, isReady)
             }.collect { (modelId, providerKeys, isReady) ->
                 _uiState.update {
@@ -175,7 +175,7 @@ class ChatViewModel(
             val modelDef = CloudAiModel.findById(modelId)
             val providerKeys = _uiState.value.providerApiKeys
             val genKey = settingsRepository.getApiKey().first()
-            val isReady = isProviderConfigured(modelDef.provider, providerKeys, genKey)
+            val isReady = if (modelDef.id == "local-llama-termux") true else isProviderConfigured(modelDef.provider, providerKeys, genKey)
             _uiState.update {
                 it.copy(
                     selectedModelId = modelId,

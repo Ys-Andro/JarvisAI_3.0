@@ -103,12 +103,12 @@ fun SettingsScreen(
 
     var selectedCategory by remember { mutableStateOf(SettingsCategory.ALL) }
 
-    var isDeviceControlExpanded by remember { mutableStateOf(true) }
-    var isApiKeysExpanded by remember { mutableStateOf(true) }
-    var isAgentExpanded by remember { mutableStateOf(true) }
-    var isGenParamsExpanded by remember { mutableStateOf(true) }
-    var isVoiceExpanded by remember { mutableStateOf(true) }
-    var isMemoryExpanded by remember { mutableStateOf(true) }
+    var isDeviceControlExpanded by remember { mutableStateOf(false) }
+    var isApiKeysExpanded by remember { mutableStateOf(false) }
+    var isAgentExpanded by remember { mutableStateOf(false) }
+    var isGenParamsExpanded by remember { mutableStateOf(false) }
+    var isVoiceExpanded by remember { mutableStateOf(false) }
+    var isMemoryExpanded by remember { mutableStateOf(false) }
     var isThemeExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
