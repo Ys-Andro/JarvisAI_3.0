@@ -268,6 +268,20 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
             var initialTouchX = 0f
             var initialTouchY = 0f
             var touchStartTime = 0L
+            var lastClickTime = 0L
+
+            // Idle opacity fade task (50% less visible when idle)
+            serviceScope.launch {
+                while (true) {
+                    kotlinx.coroutines.delay(4000)
+                    if (!isExpanded && !isListening && !isSpeaking && !isThinking) {
+                        params.alpha = 0.5f
+                        try {
+                            windowManager.updateViewLayout(composeView, params)
+                        } catch (e: Exception) {}
+                    }
+                }
+            }
 
             setOnTouchListener { view, event ->
                 if (isExpanded) {
@@ -285,6 +299,10 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
                         touchStartTime = System.currentTimeMillis()
+                        params.alpha = 1.0f // Full visibility on touch
+                        try {
+                            windowManager.updateViewLayout(composeView, params)
+                        } catch (e: Exception) {}
                         true
                     }
 
@@ -301,8 +319,15 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
                         val dy = abs(event.rawY - initialTouchY)
 
                         if (dx < 15 && dy < 15 && duration < 300) {
-                            // Click detected!
-                            setExpandedState(true)
+                            val now = System.currentTimeMillis()
+                            if (now - lastClickTime < 400) {
+                                // Double tap detected -> close/stop service
+                                stopSelf()
+                            } else {
+                                lastClickTime = now
+                                params.alpha = 1.0f
+                                setExpandedState(true)
+                            }
                         } else {
                             // Magnetic snap to edge
                             val currentDisplay = windowManager.defaultDisplay
