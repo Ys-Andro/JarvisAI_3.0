@@ -433,78 +433,7 @@ fun ProviderApiKeySection(
             }
         }
 
-        // Custom OpenAI endpoint configuration
-        if (currentProvider.id == "openai") {
-            Spacer(modifier = Modifier.height(14.dp))
-            var customEndpointInput by remember(uiState.customOpenAiEndpoint) {
-                mutableStateOf(uiState.customOpenAiEndpoint ?: "")
-            }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(JarvisSurfaceElevated)
-                    .border(1.dp, JarvisBorder, RoundedCornerShape(10.dp))
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = "ENDPOINT PERSONALIZADO (OPCIONAL)",
-                    color = JarvisPrimaryLight,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Para servidores locales (LM Studio, Ollama, vLLM) o proxies",
-                    color = JarvisTextSecondary,
-                    fontSize = 10.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = customEndpointInput,
-                    onValueChange = { customEndpointInput = it },
-                    placeholder = {
-                        Text(
-                            text = "https://api.openai.com/v1",
-                            color = JarvisTextSecondary.copy(alpha = 0.4f),
-                            fontSize = 11.sp
-                        )
-                    },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = JarvisPrimary,
-                        unfocusedBorderColor = JarvisBorder,
-                        focusedTextColor = JarvisTextPrimary,
-                        unfocusedTextColor = JarvisTextPrimary,
-                        focusedContainerColor = JarvisSurfaceVariant,
-                        unfocusedContainerColor = JarvisSurfaceVariant
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = { onSaveCustomEndpoint(customEndpointInput.trim()) },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = JarvisSurfaceVariant,
-                        contentColor = JarvisPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "GUARDAR ENDPOINT PERSONALIZADO",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-        }
 
         Spacer(modifier = Modifier.height(20.dp))
 

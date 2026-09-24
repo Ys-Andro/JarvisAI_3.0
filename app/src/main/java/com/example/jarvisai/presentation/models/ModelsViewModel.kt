@@ -30,13 +30,6 @@ class ModelsViewModel(
     private val _uiState = MutableStateFlow(ModelsUiState())
     val uiState: StateFlow<ModelsUiState> = _uiState.asStateFlow()
 
-    // Local LLM State Flows
-    val localLlmDownloading = com.example.jarvisai.data.util.LocalLlmManager.isDownloading
-    val localLlmProgress = com.example.jarvisai.data.util.LocalLlmManager.downloadProgress
-    val localLlmDownloaded = com.example.jarvisai.data.util.LocalLlmManager.isModelDownloaded
-    val localLlmInitializing = com.example.jarvisai.data.util.LocalLlmManager.isInitializing
-    val localLlmLoaded = com.example.jarvisai.data.util.LocalLlmManager.isModelLoaded
-
     init {
         observeSettings()
         observeTheme()
@@ -44,51 +37,6 @@ class ModelsViewModel(
         observeGeminiModel()
         observeProviderApiKeys()
         observeSelectedAgent()
-        
-        // Auto-initialize local LLM in background if downloaded
-        viewModelScope.launch {
-            if (com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)) {
-                com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
-            }
-        }
-    }
-
-    fun downloadLocalLlm() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Iniciando descarga de Llama 3.2 1B (Aprox. 1.2GB), por favor no cierre la app...") }
-            val success = com.example.jarvisai.data.util.LocalLlmManager.downloadModel(context)
-            if (success) {
-                _uiState.update { it.copy(statusMessage = "¡Modelo descargado con éxito! Inicializando motor...") }
-                val initSuccess = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
-                if (initSuccess) {
-                    _uiState.update { it.copy(statusMessage = "¡J.A.R.V.I.S. Local LLM activo y listo para operar fuera de línea! 🧠") }
-                } else {
-                    _uiState.update { it.copy(errorMessage = "Modelo descargado, pero falló la inicialización en este hardware.") }
-                }
-            } else {
-                _uiState.update { it.copy(errorMessage = "Error en la descarga del modelo local. Verifique su conexión.") }
-            }
-        }
-    }
-
-    fun deleteLocalLlm() {
-        val deleted = com.example.jarvisai.data.util.LocalLlmManager.deleteModel(context)
-        if (deleted) {
-            _uiState.update { it.copy(statusMessage = "Modelo local eliminado del dispositivo. Almacenamiento liberado.") }
-        } else {
-            _uiState.update { it.copy(statusMessage = "No se encontró ningún archivo de modelo para eliminar.") }
-        }
-    }
-
-    fun initializeLocalLlm() {
-        viewModelScope.launch {
-            val initialized = com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
-            if (initialized) {
-                _uiState.update { it.copy(statusMessage = "Motor local cargado exitosamente en memoria.") }
-            } else {
-                _uiState.update { it.copy(errorMessage = "No se pudo cargar el modelo local. Asegúrese de haberlo descargado.") }
-            }
-        }
     }
 
     private fun observeSelectedAgent() {
@@ -309,45 +257,5 @@ class ModelsViewModel(
 
     fun dismissMessage() {
         _uiState.update { it.copy(statusMessage = null, errorMessage = null) }
-    }
-
-    fun copySelectedModelFile(uri: android.net.Uri) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Copiando archivo de modelo al almacenamiento seguro de J.A.R.V.I.S...") }
-            val success = withContext(Dispatchers.IO) {
-                try {
-                    val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext false
-                    val targetFile = com.example.jarvisai.data.util.LocalLlmManager.getModelFile(context)
-                    val tempFile = java.io.File(context.cacheDir, "copied_model.tmp")
-                    if (tempFile.exists()) tempFile.delete()
-                    
-                    val outputStream = java.io.FileOutputStream(tempFile)
-                    val buffer = ByteArray(65536) // 64KB fast copying buffer
-                    var bytesRead: Int
-                    
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        outputStream.write(buffer, 0, bytesRead)
-                    }
-                    outputStream.flush()
-                    outputStream.close()
-                    inputStream.close()
-                    
-                    if (targetFile.exists()) targetFile.delete()
-                    tempFile.renameTo(targetFile)
-                    true
-                } catch (e: Exception) {
-                    Log.e("ModelsViewModel", "Error copying manually selected model", e)
-                    false
-                }
-            }
-            
-            if (success) {
-                com.example.jarvisai.data.util.LocalLlmManager.checkIfModelExists(context)
-                _uiState.update { it.copy(statusMessage = "¡Modelo local copiado con éxito! Ya puedes cargarlo en RAM.") }
-                com.example.jarvisai.data.util.LocalLlmManager.initLlmInference(context)
-            } else {
-                _uiState.update { it.copy(errorMessage = "Error al copiar el archivo. Asegúrese de tener espacio libre suficiente.") }
-            }
-        }
     }
 }

@@ -23,6 +23,15 @@ data class CloudAiModel(
 ) {
     companion object {
         val ALL_MODELS = listOf(
+            // Local Termux GGUF Model
+            CloudAiModel(
+                id = "local-llama-termux",
+                provider = ModelProvider.CUSTOM_OPENAI,
+                name = "Llama 3.2 1B (Local GGUF Termux)",
+                description = "Ejecuta tu modelo .gguf local a través de llama-server en Termux (localhost:8080)",
+                defaultContextLength = 2048
+            ),
+
             // Google Gemini (Default Model: gemini-3.6-flash)
             CloudAiModel(
                 id = "gemini-3.6-flash",

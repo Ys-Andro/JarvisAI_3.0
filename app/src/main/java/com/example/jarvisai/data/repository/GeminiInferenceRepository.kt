@@ -97,46 +97,53 @@ class GeminiInferenceRepository(
         settings: GenerationSettings,
         imageBase64: String?,
         imageMimeType: String?
-    ): Flow<String> = flow {
-        // Check for offline/local bypass
-        val isOffline = !networkMonitor.isCurrentlyOnline || settings.forceOffline
-        val docs = documentRepository.getAllDocuments().first()
-        val mems = memoryRepository.getAllMemories().first()
-        val localResponse = com.example.jarvisai.data.util.OfflineInferenceEngine.tryLocalOfflineInference(
-            context = context,
-            prompt = prompt,
-            isOffline = isOffline,
-            documents = docs,
-            memories = mems
-        )
-        if (localResponse != null) {
-            _inferenceState.value = InferenceState.Generating(
-                partialText = localResponse,
-                tokensPerSecond = 100f
+    ): Flow<String> {
+        var currentModelDef: CloudAiModel? = null
+        return flow {
+            // Check for offline/local bypass
+            val isOffline = !networkMonitor.isCurrentlyOnline || settings.forceOffline
+            val docs = documentRepository.getAllDocuments().first()
+            val mems = memoryRepository.getAllMemories().first()
+            val localResponse = com.example.jarvisai.data.util.OfflineInferenceEngine.tryLocalOfflineInference(
+                context = context,
+                prompt = prompt,
+                isOffline = isOffline,
+                documents = docs,
+                memories = mems
             )
-            val chunks = localResponse.chunked(12)
-            for (chunk in chunks) {
-                emit(chunk)
-                kotlinx.coroutines.delay(10)
+            if (localResponse != null) {
+                _inferenceState.value = InferenceState.Generating(
+                    partialText = localResponse,
+                    tokensPerSecond = 100f
+                )
+                val chunks = localResponse.chunked(12)
+                for (chunk in chunks) {
+                    emit(chunk)
+                    kotlinx.coroutines.delay(10)
+                }
+                
+                // Execute physical command immediately
+                val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
+                val matchResult = actionRegex.find(localResponse)
+                if (matchResult != null) {
+                    val jsonPayload = matchResult.groupValues[1]
+                    val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
+                    val confirmation = "\n\n✓ $actionResultMsg"
+                    emit(confirmation)
+                }
+                
+                _inferenceState.value = InferenceState.Idle
+                return@flow
             }
-            
-            // Execute physical command immediately
-            val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
-            val matchResult = actionRegex.find(localResponse)
-            if (matchResult != null) {
-                val jsonPayload = matchResult.groupValues[1]
-                val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
-                val confirmation = "\n\n✓ $actionResultMsg"
-                emit(confirmation)
-            }
-            
-            _inferenceState.value = InferenceState.Idle
-            return@flow
-        }
 
-        val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
-        val modelDef = CloudAiModel.findById(selectedModelId)
-        val apiKey = resolveApiKeyForProvider(modelDef.provider)
+            val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
+            val modelDef = CloudAiModel.findById(selectedModelId)
+            currentModelDef = modelDef
+            val apiKey = if (modelDef.id == "local-llama-termux") {
+                "local-llama-key"
+            } else {
+                resolveApiKeyForProvider(modelDef.provider)
+            }
         if (apiKey.isBlank()) {
             val errorMsg = "Por favor ingresa tu API Key para ${modelDef.provider.displayName} en Ajustes."
             _inferenceState.value = InferenceState.Error(errorMsg)
@@ -277,8 +284,12 @@ class GeminiInferenceRepository(
         .catch { e ->
             Log.w(TAG, "AI stream issue: ${e.message}")
             val errorMsg = e.message ?: ""
-            val friendlyMsg = if (errorMsg.contains("429") || errorMsg.contains("503") || errorMsg.contains("overloaded") || errorMsg.contains("quota") || errorMsg.contains("resource_exhausted")) {
-                "⚠️ La API del modelo está temporalmente sobrecargada o sin cuota disponible (Límite de peticiones excedido). Puedes consultar tu historial de conversaciones, notas de memoria y documentos analizados sin conexión (Modo Offline) mientras se restablece el servicio."
+            val friendlyMsg = if (currentModelDef?.id == "local-llama-termux") {
+                "⚠️ No se pudo establecer conexión con Termux en http://127.0.0.1:8080.\n\nPor favor, verifique que ha iniciado llama-server en Termux ejecutando:\nllama-server --model <su_modelo>.gguf --port 8080"
+            } else if (e is java.net.ConnectException || e is java.net.UnknownHostException || errorMsg.contains("connect", ignoreCase = true) || errorMsg.contains("host", ignoreCase = true)) {
+                "⚠️ Sin conexión a internet o servidor inalcanzable.\n\nPuedes chatear de forma 100% offline y privada seleccionando el modelo local 'Llama 3.2 1B (Local GGUF Termux)' (asegúrese de correr llama-server en Termux)."
+            } else if (errorMsg.contains("429") || errorMsg.contains("503") || errorMsg.contains("overloaded") || errorMsg.contains("quota") || errorMsg.contains("resource_exhausted")) {
+                "⚠️ La API del modelo está temporalmente sobrecargada o sin cuota disponible. Puedes chatear offline usando el modelo local 'Llama 3.2 1B (Local GGUF Termux)' a través de Termux."
             } else {
                 "❌ Error en la generación: ${e.message ?: "Error de comunicación con el servicio"}"
             }
@@ -286,6 +297,7 @@ class GeminiInferenceRepository(
             emit(friendlyMsg)
         }
         .flowOn(dispatcher)
+    }
 
     override suspend fun stopGeneration() {
         withContext(dispatcher) {
