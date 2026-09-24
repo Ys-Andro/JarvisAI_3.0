@@ -125,6 +125,14 @@ val PROVIDERS_META = listOf(
         placeholder = "sk-ant-api...",
         hint = "Claude 3.5 Sonnet líder en código y comprensión analítica.",
         brandColor = Color(0xFFD97706)
+    ),
+    ProviderMeta(
+        id = "custom",
+        name = "Local GGUF (Termux)",
+        badge = "TERMUX",
+        placeholder = "Tu API Key de Termux / Local",
+        hint = "Clave de API para autenticar y conectar con el servidor local llama-server en Termux (localhost:8080).",
+        brandColor = Color(0xFF00E5FF)
     )
 )
 

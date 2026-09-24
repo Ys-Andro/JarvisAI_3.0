@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -440,55 +441,135 @@ private fun ChatTopBar(
                     expanded = isDropdownExpanded,
                     onDismissRequest = { isDropdownExpanded = false },
                     modifier = Modifier
+                        .width(325.dp)
+                        .heightIn(max = 480.dp)
                         .background(JarvisSurfaceElevated)
                         .border(1.dp, JarvisBorder, RoundedCornerShape(12.dp))
                 ) {
-                    CloudAiModel.ALL_MODELS.forEach { model ->
-                        val isSelected = model.id == selectedModelId
-                        val isReady = isProviderReady(model.provider)
-                        DropdownMenuItem(
-                            text = {
-                                Column(modifier = Modifier.padding(vertical = 2.dp)) {
+                    val groupedModels = CloudAiModel.ALL_MODELS.groupBy { it.provider }
+                    
+                    groupedModels.forEach { (provider, models) ->
+                        val brandColor = when (provider) {
+                            com.example.jarvisai.domain.model.ModelProvider.GEMINI -> Color(0xFF4285F4)
+                            com.example.jarvisai.domain.model.ModelProvider.OPENROUTER -> Color(0xFF651FFF)
+                            com.example.jarvisai.domain.model.ModelProvider.OPENAI -> Color(0xFF10A37F)
+                            com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> Color(0xFF0070F3)
+                            com.example.jarvisai.domain.model.ModelProvider.GROQ -> Color(0xFFF55036)
+                            com.example.jarvisai.domain.model.ModelProvider.ANTHROPIC -> Color(0xFFD97706)
+                            com.example.jarvisai.domain.model.ModelProvider.CUSTOM_OPENAI -> Color(0xFF00E5FF)
+                        }
+                        
+                        val providerIcon = when (provider) {
+                            com.example.jarvisai.domain.model.ModelProvider.GEMINI -> Icons.Default.AutoAwesome
+                            com.example.jarvisai.domain.model.ModelProvider.CUSTOM_OPENAI -> Icons.Default.Code
+                            com.example.jarvisai.domain.model.ModelProvider.GROQ -> Icons.Default.Lightbulb
+                            com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> Icons.Default.BubbleChart
+                            else -> Icons.Default.Settings
+                        }
+
+                        // Provider Header Category Indicator
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(brandColor.copy(alpha = 0.08f))
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = providerIcon,
+                                    contentDescription = null,
+                                    tint = brandColor,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = provider.displayName.uppercase(),
+                                    color = brandColor,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 0.8.sp
+                                )
+                            }
+                        }
+
+                        models.forEach { model ->
+                            val isSelected = model.id == selectedModelId
+                            val isReady = isProviderReady(model.provider)
+                            
+                            DropdownMenuItem(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(if (isSelected) brandColor.copy(alpha = 0.06f) else Color.Transparent),
+                                text = {
                                     Row(
+                                        modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(
-                                            text = model.name,
-                                            color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 13.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(4.dp))
-                                                .background(if (isReady) Color(0x2000E5FF) else Color(0x25FF5252))
-                                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                                        Column(
+                                            modifier = Modifier.weight(1f).padding(end = 8.dp, top = 1.dp, bottom = 1.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                if (isSelected) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(6.dp)
+                                                            .clip(CircleShape)
+                                                            .background(brandColor)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = model.name,
+                                                    color = if (isSelected) JarvisPrimary else JarvisTextPrimary,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    fontSize = 12.5.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            Text(
+                                                text = model.description,
+                                                color = JarvisTextSecondary,
+                                                fontSize = 10.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = if (isSelected) Modifier.padding(start = 12.dp) else Modifier
+                                            )
+                                        }
+
+                                        // Status glow pill
+                                        Surface(
+                                            color = if (isReady) brandColor.copy(alpha = 0.12f) else Color(0x15FF5252),
+                                            shape = RoundedCornerShape(4.dp),
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                1.dp,
+                                                if (isReady) brandColor.copy(alpha = 0.4f) else Color(0x35FF5252)
+                                            )
                                         ) {
                                             Text(
                                                 text = if (isReady) "Listo" else "Sin Key",
-                                                color = if (isReady) JarvisAccentGreen else Color(0xFFFF8A80),
-                                                fontSize = 9.sp,
+                                                color = if (isReady) brandColor else Color(0xFFFF8A80),
+                                                fontSize = 8.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace
+                                                fontFamily = FontFamily.Monospace,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
                                         }
                                     }
-                                    Text(
-                                        text = model.description,
-                                        color = JarvisTextSecondary,
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                },
+                                onClick = {
+                                    onModelSelected(model.id)
+                                    isDropdownExpanded = false
                                 }
-                            },
-                            onClick = {
-                                onModelSelected(model.id)
-                                isDropdownExpanded = false
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }

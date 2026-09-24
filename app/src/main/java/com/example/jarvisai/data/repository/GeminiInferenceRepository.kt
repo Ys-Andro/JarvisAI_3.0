@@ -139,11 +139,7 @@ class GeminiInferenceRepository(
             val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
             val modelDef = CloudAiModel.findById(selectedModelId)
             currentModelDef = modelDef
-            val apiKey = if (modelDef.id == "local-llama-termux") {
-                "local-llama-key"
-            } else {
-                resolveApiKeyForProvider(modelDef.provider)
-            }
+            val apiKey = resolveApiKeyForProvider(modelDef.provider)
         if (apiKey.isBlank()) {
             val errorMsg = "Por favor ingresa tu API Key para ${modelDef.provider.displayName} en Ajustes."
             _inferenceState.value = InferenceState.Error(errorMsg)
