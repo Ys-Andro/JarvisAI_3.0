@@ -41,6 +41,46 @@ class DocumentsViewModel(
         _uiState.update { it.copy(selectedDocument = document) }
     }
 
+    fun uploadAndParseDocument(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (_: Exception) {}
+
+                val parsed = com.example.jarvisai.data.util.DocumentParser.parseDocument(context, uri)
+                val id = documentRepository.saveDocument(
+                    title = parsed.title,
+                    fileType = parsed.fileType,
+                    content = parsed.content,
+                    uriString = uri.toString()
+                )
+                val savedDoc = documentRepository.getDocumentById(id)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        selectedDocument = savedDoc
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Error al procesar archivo: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissError() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
     fun deleteDocument(id: Long) {
         viewModelScope.launch {
             documentRepository.deleteDocument(id)

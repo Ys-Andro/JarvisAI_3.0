@@ -350,11 +350,26 @@ fun DeviceControlScreen(
 
             // System Default Assistant Card
             item {
+                val isDefaultAssistant = remember(context) {
+                    try {
+                        val assistantSetting = android.provider.Settings.Secure.getString(
+                            context.contentResolver,
+                            "assistant"
+                        )
+                        assistantSetting != null && assistantSetting.contains(context.packageName)
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder)
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isDefaultAssistant) JarvisAccentGreen else JarvisBorder
+                    )
                 ) {
                     Column(
                         modifier = Modifier
@@ -370,13 +385,16 @@ fun DeviceControlScreen(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(JarvisPrimary.copy(alpha = 0.2f)),
+                                    .background(
+                                        if (isDefaultAssistant) JarvisAccentGreen.copy(alpha = 0.2f)
+                                        else JarvisPrimary.copy(alpha = 0.2f)
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = JarvisPrimary,
+                                    tint = if (isDefaultAssistant) JarvisAccentGreen else JarvisPrimary,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -389,8 +407,8 @@ fun DeviceControlScreen(
                                     fontFamily = FontFamily.Monospace
                                 )
                                 Text(
-                                    text = "CONFIGURAR COMO VOZ PRINCIPAL",
-                                    color = JarvisPrimaryLight,
+                                    text = if (isDefaultAssistant) "● ASISTENTE ACTIVO EN ANDROID" else "○ NO SELECCIONADO AÚN",
+                                    color = if (isDefaultAssistant) JarvisAccentGreen else JarvisAccentOrange,
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold
@@ -399,39 +417,80 @@ fun DeviceControlScreen(
                         }
 
                         Text(
-                            text = "Establece a Jarvis como tu asistente de voz predeterminado del sistema para invocarlo rápidamente mediante gestos o manteniendo presionado el botón de inicio.",
+                            text = "Configura a Jarvis como la app de asistencia digital predeterminada de tu teléfono. Al activarlo, podrás invocar a Jarvis deslizando desde las esquinas inferiores o manteniendo pulsado el botón de inicio/encendido.",
                             color = JarvisTextSecondary,
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
+                            fontSize = 11.5.sp,
+                            lineHeight = 16.sp
                         )
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = JarvisSurfaceVariant.copy(alpha = 0.6f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "PASOS PARA ACTIVAR:",
+                                    fontSize = 9.5.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JarvisPrimaryLight
+                                )
+                                Text(
+                                    text = "1. Pulsa el botón de abajo para ir a 'Aplicaciones predeterminadas'.",
+                                    fontSize = 10.sp,
+                                    color = JarvisTextSecondary
+                                )
+                                Text(
+                                    text = "2. Entra a 'Aplicación de asistencia digital' (o 'Asistente').",
+                                    fontSize = 10.sp,
+                                    color = JarvisTextSecondary
+                                )
+                                Text(
+                                    text = "3. Selecciona 'Jarvis' en la lista y presiona Aceptar.",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JarvisTextPrimary
+                                )
+                            }
+                        }
 
                         Button(
                             onClick = {
-                                try {
-                                    val intent = Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS).apply {
-                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
+                                val intents = listOf(
+                                    Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS),
+                                    Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+                                    Intent("com.android.settings.action.ASSIST_GESTURE"),
+                                    Intent(android.provider.Settings.ACTION_SETTINGS)
+                                )
+                                var launched = false
+                                for (intent in intents) {
                                     try {
-                                        val intent = Intent(android.provider.Settings.ACTION_SETTINGS).apply {
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        }
+                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                         context.startActivity(intent)
-                                    } catch (ex: Exception) {
-                                        ex.printStackTrace()
-                                    }
+                                        launched = true
+                                        break
+                                    } catch (_: Exception) {}
                                 }
                             },
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = JarvisSurfaceVariant,
-                                contentColor = JarvisPrimary
+                                containerColor = if (isDefaultAssistant) JarvisAccentGreen.copy(alpha = 0.2f) else JarvisSurfaceVariant,
+                                contentColor = if (isDefaultAssistant) JarvisAccentGreen else JarvisPrimary
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isDefaultAssistant) JarvisAccentGreen else JarvisPrimary
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "CONFIGURAR ASISTENTE DEL SISTEMA",
+                                text = if (isDefaultAssistant) "CAMBIAR CONFIGURACIÓN DE ASISTENTE" else "ABRIR AJUSTES DE ASISTENTE",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace

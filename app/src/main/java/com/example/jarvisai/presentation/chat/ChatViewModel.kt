@@ -206,14 +206,22 @@ class ChatViewModel(
         }
     }
 
-    fun attachDocument(title: String, fileType: String, content: String, uriString: String? = null) {
+    fun attachDocument(
+        title: String,
+        fileType: String,
+        content: String,
+        uriString: String? = null,
+        imageBase64: String? = null
+    ) {
         viewModelScope.launch {
             documentRepository.saveDocument(title, fileType, content, uriString)
             _uiState.update {
                 it.copy(
                     attachedDocumentTitle = title,
                     attachedDocumentType = fileType,
-                    attachedDocumentContent = content
+                    attachedDocumentContent = content,
+                    attachedImageBase64 = it.attachedImageBase64 ?: imageBase64,
+                    attachedImageMimeType = if (imageBase64 != null && it.attachedImageMimeType == null) "image/jpeg" else it.attachedImageMimeType
                 )
             }
         }
@@ -327,8 +335,21 @@ class ChatViewModel(
     }
 
     fun sendMessage() {
-        val prompt = _uiState.value.inputPrompt.trim()
-        if (prompt.isEmpty()) return
+        val rawPrompt = _uiState.value.inputPrompt.trim()
+        val hasDoc = !_uiState.value.attachedDocumentTitle.isNullOrBlank()
+        val hasImage = !_uiState.value.attachedImageUri.isNullOrBlank() || !_uiState.value.attachedImageBase64.isNullOrBlank()
+
+        if (rawPrompt.isEmpty() && !hasDoc && !hasImage) return
+
+        val prompt = if (rawPrompt.isEmpty()) {
+            when {
+                hasDoc -> "Por favor analiza en profundidad este documento adjunto, resume sus puntos principales, conclusiones clave y datos más relevantes."
+                hasImage -> "Analiza y describe detalladamente esta imagen."
+                else -> ""
+            }
+        } else {
+            rawPrompt
+        }
 
         val currentModel = CloudAiModel.findById(_uiState.value.selectedModelId)
         if (!_uiState.value.isModelLoaded) {

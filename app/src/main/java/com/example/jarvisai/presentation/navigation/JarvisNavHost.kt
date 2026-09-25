@@ -99,6 +99,18 @@ fun JarvisNavHost(
                 viewModel = documentsViewModel,
                 onBackClick = {
                     navController.popBackStack()
+                },
+                onConsultInChat = { doc ->
+                    chatViewModel.attachDocument(
+                        title = doc.title,
+                        fileType = doc.fileType,
+                        content = doc.content,
+                        uriString = doc.uriString
+                    )
+                    chatViewModel.onInputChange("Por favor analiza y resume este documento adjunto.")
+                    navController.navigate(Screen.Chat.route) {
+                        popUpTo(Screen.Chat.route) { inclusive = true }
+                    }
                 }
             )
         }

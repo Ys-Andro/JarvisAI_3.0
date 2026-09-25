@@ -178,7 +178,8 @@ fun ChatScreen(
                 title = parsed.title,
                 fileType = parsed.fileType,
                 content = parsed.content,
-                uriString = uri.toString()
+                uriString = uri.toString(),
+                imageBase64 = parsed.imageBase64
             )
         }
     }

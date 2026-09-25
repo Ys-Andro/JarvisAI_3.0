@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleAssistIntent(intent)
 
         setContent {
             val modelsUiState by modelsViewModel.uiState.collectAsState()
@@ -73,6 +74,27 @@ class MainActivity : ComponentActivity() {
                         modelsViewModel = modelsViewModel,
                         viewModelFactory = viewModelFactory
                     )
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAssistIntent(intent)
+    }
+
+    private fun handleAssistIntent(incomingIntent: android.content.Intent?) {
+        val action = incomingIntent?.action
+        if (action == android.content.Intent.ACTION_ASSIST || action == android.content.Intent.ACTION_VOICE_COMMAND) {
+            // Trigger floating bubble if permission is granted
+            if (android.provider.Settings.canDrawOverlays(this)) {
+                try {
+                    val serviceIntent = android.content.Intent(this, com.example.jarvisai.data.service.JarvisFloatingBubbleService::class.java)
+                    startService(serviceIntent)
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }
