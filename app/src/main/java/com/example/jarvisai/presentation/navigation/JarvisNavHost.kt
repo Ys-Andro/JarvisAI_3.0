@@ -10,6 +10,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jarvisai.presentation.JarvisViewModelFactory
+import com.example.jarvisai.presentation.agent.AutonomousAgentPlannerScreen
+import com.example.jarvisai.presentation.agent.AutonomousAgentPlannerViewModel
 import com.example.jarvisai.presentation.chat.ChatScreen
 import com.example.jarvisai.presentation.chat.ChatViewModel
 import com.example.jarvisai.presentation.device.DeviceControlScreen
@@ -48,6 +50,9 @@ fun JarvisNavHost(
                 },
                 onNavigateToHistory = {
                     navController.navigate(Screen.Library.route)
+                },
+                onNavigateToAgentPlanner = {
+                    navController.navigate(Screen.AgentPlanner.route)
                 }
             )
         }
@@ -117,6 +122,16 @@ fun JarvisNavHost(
 
         composable(Screen.DeviceControl.route) {
             DeviceControlScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.AgentPlanner.route) {
+            val agentViewModel: AutonomousAgentPlannerViewModel = viewModel(factory = viewModelFactory)
+            AutonomousAgentPlannerScreen(
+                viewModel = agentViewModel,
                 onBackClick = {
                     navController.popBackStack()
                 }

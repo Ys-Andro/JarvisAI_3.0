@@ -118,6 +118,7 @@ fun ChatScreen(
     viewModel: ChatViewModel,
     onNavigateToModels: () -> Unit,
     onNavigateToHistory: () -> Unit,
+    onNavigateToAgentPlanner: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -237,7 +238,8 @@ fun ChatScreen(
                     },
                     onModelsClick = onNavigateToModels,
                     onHistoryClick = onNavigateToHistory,
-                    onLiveModeClick = { showLiveMode = true }
+                    onLiveModeClick = { showLiveMode = true },
+                    onAgentPlannerClick = onNavigateToAgentPlanner
                 )
             },
             bottomBar = {
@@ -378,6 +380,7 @@ private fun ChatTopBar(
     onModelsClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onLiveModeClick: () -> Unit,
+    onAgentPlannerClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isModelSheetOpen by remember { mutableStateOf(false) }
@@ -664,6 +667,33 @@ private fun ChatTopBar(
                             onClick = {
                                 isMenuExpanded = false
                                 onShareClick()
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Memory,
+                                        contentDescription = null,
+                                        tint = JarvisAccentCyan,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "PLANIFICADOR AGÉNTICO",
+                                        color = JarvisAccentCyan,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onAgentPlannerClick()
                             }
                         )
 

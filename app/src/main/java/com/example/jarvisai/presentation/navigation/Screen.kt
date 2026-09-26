@@ -7,4 +7,5 @@ sealed class Screen(val route: String) {
     object Memory : Screen("memory_screen")
     object Documents : Screen("documents_screen")
     object DeviceControl : Screen("device_control_screen")
+    object AgentPlanner : Screen("agent_planner_screen")
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.jarvisai.di.AppContainer
+import com.example.jarvisai.presentation.agent.AutonomousAgentPlannerViewModel
 import com.example.jarvisai.presentation.chat.ChatViewModel
 import com.example.jarvisai.presentation.documents.DocumentsViewModel
 import com.example.jarvisai.presentation.library.LibraryViewModel
@@ -48,6 +49,12 @@ class JarvisViewModelFactory(
             modelClass.isAssignableFrom(DocumentsViewModel::class.java) -> {
                 DocumentsViewModel(
                     documentRepository = appContainer.documentRepository
+                ) as T
+            }
+            modelClass.isAssignableFrom(AutonomousAgentPlannerViewModel::class.java) -> {
+                AutonomousAgentPlannerViewModel(
+                    inferenceRepository = appContainer.inferenceRepository,
+                    settingsRepository = appContainer.settingsRepository
                 ) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
