@@ -116,16 +116,41 @@ class GeminiInferenceRepository(
             return@flow
         }
 
-        // Fetch active agent personality and long-term memories
+        // Fetch active agent personality, long-term memories, and saved knowledge documents
         val agentId = settingsRepository.getSelectedAgentId().first()
         val agent = com.example.jarvisai.domain.model.Agent.findById(agentId)
         val memories = memoryRepository.getAllMemories().first()
+        val documents = documentRepository.getAllDocuments().first()
 
         val memoryContext = if (memories.isNotEmpty()) {
             buildString {
                 append("\n\n[MEMORIA A LARGO PLAZO Y DATOS RELEVANTES DEL USUARIO]:\n")
                 for (m in memories) {
-                    append("- ${m.key}: ${m.value} (${m.category})\n")
+                    append("- [ID ${m.id}] ${m.key}: ${m.value} (${m.category})\n")
+                }
+            }
+        } else ""
+
+        val documentKnowledgeContext = if (documents.isNotEmpty()) {
+            buildString {
+                append("\n\n[BASE DE CONOCIMIENTO CENTRALIZADA - SEGUNDO CEREBRO (DOCUMENTOS APRENDIDOS Y GUARDADOS)]:\n")
+                append("El usuario ha subido los siguientes documentos a tu núcleo para que aprendas de ellos y extraigas información. Tienes acceso total a su contenido para responder preguntas, resumir, cruzar datos y asesorar al usuario:")
+                var totalChars = 0
+                val maxDocChars = 22000
+                for (doc in documents) {
+                    if (totalChars >= maxDocChars) {
+                        append("\n... (Y ${documents.size} documentos en total indexados en tu base de datos)")
+                        break
+                    }
+                    val snippet = if (doc.content.length > 4500) {
+                        doc.content.take(4500) + "\n...[Extracto adicional indexado]"
+                    } else {
+                        doc.content
+                    }
+                    totalChars += snippet.length
+                    append("\n\n=== DOCUMENTO: \"${doc.title}\" (${doc.fileType}) ===\n")
+                    append(snippet)
+                    append("\n==================================================")
                 }
             }
         } else ""
@@ -137,17 +162,18 @@ class GeminiInferenceRepository(
                 append("\n\n$userPrompt")
             }
             append(memoryContext)
+            append(documentKnowledgeContext)
             append("""
                 
                 [CAPACIDAD DE CONTROL TOTAL DEL DISPOSITIVO Y AUTOMATIZACIÓN - JARVIS DEVICE AGENT]:
                 Eres Jarvis, un asistente de IA de élite capaz de controlar el teléfono Android del usuario en tiempo real en respuesta a comandos de voz o texto en lenguaje natural.
-                Cuando el usuario solicite una acción física, control de ajustes, apertura de apps, llamadas, mensajes, alarmas o interacción con la pantalla, formula tu respuesta con cortesía y estilo Jarvis y añade AL FINAL DE TU RESPUESTA el comando de acción en formato estructurado:
+                Cuando el usuario solicite una acción física, control de ajustes, apertura de apps, llamadas, mensajes, alarmas, interactuar con la pantalla o guardar memorias personales, formula tu respuesta con cortesía y estilo Jarvis y añade AL FINAL DE TU RESPUESTA el comando de acción en formato estructurado:
                 [JARVIS_ACTION: {"action":"NOMBRE_ACCION", ...parámetros}]
 
                 [REGLA DE SEGURIDAD CRÍTICA Y PREVENCIÓN DE ACCIONES NO SOLICITADAS]:
-                - SOLO debes incluir el bloque [JARVIS_ACTION: ...] si el usuario te ha solicitado de manera EXPLÍCITA y DIRECTA realizar un control físico o de pantalla.
-                - NUNCA, bajo ningún concepto, ejecutes acciones intrusivas como "SCREENSHOT" (captura de pantalla) o "READ_SCREEN" (leer pantalla) de manera automática o por iniciativa propia para 'conocer el contexto'. SOLO utilízalas si el usuario lo pide explícitamente con comandos como: "toma captura de pantalla", "haz una captura", "lee la pantalla", "qué hay en mi pantalla".
-                - Si el usuario te hace una pregunta informativa, de charla, o cualquier consulta normal que no sea una orden de hardware directa, NO debes incluir absolutamente ningún bloque [JARVIS_ACTION: ...] al final de tu mensaje. Responde solo con texto conversacional normal.
+                - SOLO debes incluir el bloque [JARVIS_ACTION: ...] si el usuario te ha solicitado de manera EXPLÍCITA y DIRECTA realizar un control físico, guardar datos o interactuar con la pantalla.
+                - NUNCA, bajo ningún concepto, ejecutes acciones intrusivas como "SCREENSHOT" (captura de pantalla) o "READ_SCREEN" (leer pantalla) de manera automática. SOLO si el usuario lo pide explícitamente con comandos como: "toma captura de pantalla", "lee la pantalla", "qué hay en pantalla".
+                - Si el usuario te hace una pregunta informativa, de charla, o cualquier consulta normal que no requiera actuar sobre el sistema, NO incluyas ningún bloque [JARVIS_ACTION: ...].
 
                 CATÁLOGO DE ACCIONES DE HARDWARE Y SISTEMA SOPORTADAS:
                 1. Linterna:
@@ -167,22 +193,22 @@ class GeminiInferenceRepository(
                    {"action":"SPOTIFY_PLAY", "query": "cancion o artista"}
                    {"action":"CALL", "number": "numero_telefonico"}
                    {"action":"WEB_SEARCH", "query": "termino_de_busqueda"}
-                6. Notificaciones:
+                   {"action":"OPEN_URL", "url": "enlace_web"}
+                6. Memoria y Datos Persistentes:
+                   {"action":"SAVE_MEMORY", "key":"titulo_o_clave", "value":"dato_a_recordar", "category":"GENERAL"} (Categorías: PERSONAL, TRABAJO, GENERAL, SALUD, PREFERENCIAS)
+                   {"action":"DELETE_MEMORY", "id": 123} o {"action":"DELETE_MEMORY", "key":"clave"}
+                7. Notificaciones:
                    {"action":"READ_NOTIFICATIONS"}
-                7. Gestos y Navegación de Pantalla (Accesibilidad):
-                   {"action":"HOME"} (Ir a pantalla de inicio)
-                   {"action":"BACK"} (Atrás)
-                   {"action":"RECENTS"} (Apps recientes)
-                   {"action":"NOTIFICATIONS"} (Panel de notificaciones)
-                   {"action":"QUICK_SETTINGS"} (Ajustes rápidos)
-                   {"action":"LOCK_SCREEN"} (Bloquear pantalla)
-                   {"action":"SCREENSHOT"} (Tomar captura de pantalla)
-                   {"action":"SCROLL_DOWN"} o {"action":"SCROLL_UP"}
-                   {"action":"CLICK_TEXT", "text": "texto_del_boton_o_elemento"}
+                8. Gestos y Navegación de Pantalla (Accesibilidad):
+                   {"action":"HOME"}, {"action":"BACK"}, {"action":"RECENTS"}, {"action":"NOTIFICATIONS"}, {"action":"QUICK_SETTINGS"}, {"action":"LOCK_SCREEN"}, {"action":"SCREENSHOT"}
+                   {"action":"SCROLL_DOWN"}, {"action":"SCROLL_UP"}
+                   {"action":"CLICK_TEXT", "text": "texto_del_boton"}
                    {"action":"TYPE_TEXT", "text": "texto_a_escribir"}
-                   {"action":"READ_SCREEN"} (Leer contenido visible en pantalla)
-                8. Ajustes de Conectividad:
+                   {"action":"READ_SCREEN"}
+                9. Ajustes de Conectividad:
                    {"action":"OPEN_SETTINGS"}, {"action":"OPEN_WIFI"}, {"action":"OPEN_BLUETOOTH"}, {"action":"OPEN_ACCESSIBILITY_SETTINGS"}
+                10. Háptico:
+                   {"action":"VIBRATE", "durationMs": int}
 
                 Ejecuta siempre las acciones solicitadas con precisión.
             """.trimIndent())
@@ -225,13 +251,65 @@ class GeminiInferenceRepository(
         }
 
         val finalResponse = accumulatedText.toString()
-        val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[^}]+\\})\\]".toRegex()
-        val matchResult = actionRegex.find(finalResponse)
-        if (matchResult != null) {
-            val jsonPayload = matchResult.groupValues[1]
-            val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
-            val confirmation = "\n\n✓ $actionResultMsg"
-            emit(confirmation)
+        val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[\\s\\S]*?\\})\\]".toRegex()
+        val actionMatches = actionRegex.findAll(finalResponse).toList()
+
+        if (actionMatches.isNotEmpty()) {
+            for (match in actionMatches) {
+                val jsonPayload = match.groupValues[1]
+                try {
+                    val json = org.json.JSONObject(jsonPayload)
+                    val actionType = json.optString("action").uppercase()
+
+                    when (actionType) {
+                        "SAVE_MEMORY" -> {
+                            val key = json.optString("key", "Dato").trim()
+                            val value = json.optString("value", "").trim()
+                            val category = json.optString("category", "GENERAL").trim().uppercase()
+                            if (key.isNotBlank() && value.isNotBlank()) {
+                                memoryRepository.saveMemory(key, value, category)
+                                emit("\n\n✓ Guardado en tu memoria a largo plazo: \"$key\" = \"$value\" [$category]")
+                            }
+                        }
+                        "DELETE_MEMORY" -> {
+                            val id = json.optLong("id", -1L)
+                            if (id > 0) {
+                                memoryRepository.deleteMemory(id)
+                                emit("\n\n✓ Memoria eliminada del núcleo.")
+                            }
+                        }
+                        else -> {
+                            val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
+                            emit("\n\n✓ $actionResultMsg")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error executing action: $jsonPayload", e)
+                }
+            }
+        } else if (finalResponse.contains("\"action\"")) {
+            // Fallback for markdown json blocks without explicit [JARVIS_ACTION: tag
+            val jsonCodeRegex = "```(?:json)?\\s*(\\{[\\s\\S]*?\"action\"[\\s\\S]*?\\})\\s*```".toRegex()
+            val codeMatch = jsonCodeRegex.find(finalResponse)
+            if (codeMatch != null) {
+                val jsonPayload = codeMatch.groupValues[1]
+                try {
+                    val json = org.json.JSONObject(jsonPayload)
+                    val actionType = json.optString("action").uppercase()
+                    if (actionType == "SAVE_MEMORY") {
+                        val key = json.optString("key", "Dato").trim()
+                        val value = json.optString("value", "").trim()
+                        val category = json.optString("category", "GENERAL").trim().uppercase()
+                        if (key.isNotBlank() && value.isNotBlank()) {
+                            memoryRepository.saveMemory(key, value, category)
+                            emit("\n\n✓ Guardado en tu memoria a largo plazo: \"$key\" = \"$value\" [$category]")
+                        }
+                    } else {
+                        val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
+                        emit("\n\n✓ $actionResultMsg")
+                    }
+                } catch (_: Exception) {}
+            }
         }
     }
         .onStart {

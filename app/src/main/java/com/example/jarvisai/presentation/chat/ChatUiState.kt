@@ -25,6 +25,8 @@ data class ChatUiState(
     val speakingMessageId: String? = null,
     val streamingMessageId: String? = null,
     val tokensPerSecond: Float = 0f,
+    val totalDocumentsLearned: Int = 0,
+    val totalMemoriesCount: Int = 0,
     val settings: com.example.jarvisai.domain.model.GenerationSettings = com.example.jarvisai.domain.model.GenerationSettings(),
     val errorMessage: String? = null
 ) {

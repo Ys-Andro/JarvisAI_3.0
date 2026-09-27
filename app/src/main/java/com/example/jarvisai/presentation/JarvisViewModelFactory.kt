@@ -26,6 +26,7 @@ class JarvisViewModelFactory(
                     settingsRepository = appContainer.settingsRepository,
                     ttsRepository = appContainer.ttsRepository,
                     documentRepository = appContainer.documentRepository,
+                    memoryRepository = appContainer.memoryRepository,
                     liveVoiceEngine = appContainer.liveVoiceEngine
                 ) as T
             }

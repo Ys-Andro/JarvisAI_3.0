@@ -12,6 +12,7 @@ import com.example.jarvisai.domain.model.Role
 import com.example.jarvisai.domain.repository.IConversationRepository
 import com.example.jarvisai.domain.repository.IDocumentRepository
 import com.example.jarvisai.domain.repository.IInferenceRepository
+import com.example.jarvisai.domain.repository.IMemoryRepository
 import com.example.jarvisai.domain.repository.ISettingsRepository
 import com.example.jarvisai.domain.repository.ITtsRepository
 import com.example.jarvisai.domain.voice.ILiveVoiceEngine
@@ -32,6 +33,7 @@ class ChatViewModel(
     private val settingsRepository: ISettingsRepository,
     private val ttsRepository: ITtsRepository,
     private val documentRepository: IDocumentRepository,
+    private val memoryRepository: IMemoryRepository,
     val liveVoiceEngine: ILiveVoiceEngine
 ) : ViewModel() {
 
@@ -47,8 +49,31 @@ class ChatViewModel(
         observeTtsState()
         observeModelAndApiKeys()
         observeSettings()
+        observeKnowledgeAndMemories()
         initDefaultConversation()
         setupLiveVoiceEngine()
+    }
+
+    private fun observeKnowledgeAndMemories() {
+        viewModelScope.launch {
+            documentRepository.getAllDocuments().collect { docs ->
+                _uiState.update { it.copy(totalDocumentsLearned = docs.size) }
+            }
+        }
+        viewModelScope.launch {
+            memoryRepository.getAllMemories().collect { mems ->
+                _uiState.update { it.copy(totalMemoriesCount = mems.size) }
+            }
+        }
+    }
+
+    fun onQuickActionClick(actionPrompt: String, isDirectExecution: Boolean = true) {
+        if (isDirectExecution) {
+            _uiState.update { it.copy(inputPrompt = actionPrompt) }
+            sendMessage()
+        } else {
+            _uiState.update { it.copy(inputPrompt = actionPrompt) }
+        }
     }
 
     private fun setupLiveVoiceEngine() {

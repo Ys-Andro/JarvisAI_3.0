@@ -80,9 +80,9 @@ fun MessageBubble(
     val clipboardManager = LocalClipboardManager.current
     var isCopied by remember { mutableStateOf(false) }
 
-    val hasAction = !isUser && message.content.contains("[JARVIS_ACTION:")
-    val displayContent = if (hasAction) {
-        message.content.replace(Regex("\\[JARVIS_ACTION:[^\\]]+\\]"), "").trim()
+    val hasAction = !isUser && (message.content.contains("[JARVIS_ACTION:") || message.content.contains("✓ "))
+    val displayContent = if (message.content.contains("[JARVIS_ACTION:")) {
+        message.content.replace(Regex("\\[JARVIS_ACTION:\\s*\\{[\\s\\S]*?\\}\\]"), "").trim()
     } else {
         message.content
     }

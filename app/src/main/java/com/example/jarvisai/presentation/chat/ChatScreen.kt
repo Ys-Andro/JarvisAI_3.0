@@ -46,11 +46,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lightbulb
@@ -58,6 +61,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -119,6 +123,9 @@ fun ChatScreen(
     onNavigateToModels: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToAgentPlanner: () -> Unit,
+    onNavigateToDocuments: () -> Unit = {},
+    onNavigateToDeviceControl: () -> Unit = {},
+    onNavigateToMemory: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -216,6 +223,7 @@ fun ChatScreen(
                     isModelLoaded = uiState.isModelLoaded,
                     isProviderReady = { uiState.isProviderReady(it) },
                     tokensPerSecond = uiState.tokensPerSecond,
+                    docsCount = uiState.totalDocumentsLearned,
                     onShareClick = {
                         val exportText = viewModel.getConversationExportText()
                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -236,6 +244,9 @@ fun ChatScreen(
                             DeviceController.openOverlaySettings(context)
                         }
                     },
+                    onDocumentsClick = onNavigateToDocuments,
+                    onDeviceControlClick = onNavigateToDeviceControl,
+                    onMemoryClick = onNavigateToMemory,
                     onModelsClick = onNavigateToModels,
                     onHistoryClick = onNavigateToHistory,
                     onLiveModeClick = { showLiveMode = true },
@@ -257,6 +268,7 @@ fun ChatScreen(
                             onLoadClick = onNavigateToModels
                         )
                     }
+
 
                     ChatInputBar(
                         inputText = uiState.inputPrompt,
@@ -315,6 +327,7 @@ fun ChatScreen(
                     EmptyChatPlaceholder(
                         isModelLoaded = uiState.isModelLoaded,
                         modelName = currentModel?.name ?: "Gemini 3.6 Flash",
+                        docsCount = uiState.totalDocumentsLearned,
                         onConfigureModelClick = onNavigateToModels,
                         onOpenLiveMode = { showLiveMode = true },
                         onPickDocument = {
@@ -322,6 +335,10 @@ fun ChatScreen(
                                 arrayOf("application/pdf", "text/plain", "application/msword", "*/*")
                             )
                         },
+                        onOpenDocuments = onNavigateToDocuments,
+                        onOpenDeviceControl = onNavigateToDeviceControl,
+                        onOpenAgentPlanner = onNavigateToAgentPlanner,
+                        onOpenMemory = onNavigateToMemory,
                         onOpenHistory = onNavigateToHistory
                     )
                 } else {
@@ -375,8 +392,12 @@ private fun ChatTopBar(
     isModelLoaded: Boolean,
     isProviderReady: (com.example.jarvisai.domain.model.ModelProvider) -> Boolean = { true },
     tokensPerSecond: Float,
+    docsCount: Int = 0,
     onShareClick: () -> Unit,
     onFloatingBubbleClick: () -> Unit = {},
+    onDocumentsClick: () -> Unit = {},
+    onDeviceControlClick: () -> Unit = {},
+    onMemoryClick: () -> Unit = {},
     onModelsClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onLiveModeClick: () -> Unit,
@@ -570,6 +591,42 @@ private fun ChatTopBar(
                     }
                 }
 
+                // Documents / Segundo Cerebro Quick Button
+                Surface(
+                    onClick = onDocumentsClick,
+                    shape = CircleShape,
+                    color = JarvisSurface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF64B5F6).copy(alpha = 0.7f)),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = "Documentos y Segundo Cerebro",
+                            tint = Color(0xFF64B5F6),
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+                }
+
+                // Device Control Quick Button
+                Surface(
+                    onClick = onDeviceControlClick,
+                    shape = CircleShape,
+                    color = JarvisSurface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentGreen.copy(alpha = 0.7f)),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Smartphone,
+                            contentDescription = "Control de Dispositivo",
+                            tint = JarvisAccentGreen,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+                }
+
                 // Floating Bubble Assistant Launcher
                 Surface(
                     onClick = onFloatingBubbleClick,
@@ -616,6 +673,87 @@ private fun ChatTopBar(
                             .background(JarvisSurfaceElevated)
                             .border(1.dp, JarvisBorder, RoundedCornerShape(12.dp))
                     ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Description,
+                                        contentDescription = null,
+                                        tint = Color(0xFF64B5F6),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "SEGUNDO CEREBRO (DOCS)",
+                                        color = Color(0xFF64B5F6),
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onDocumentsClick()
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Smartphone,
+                                        contentDescription = null,
+                                        tint = JarvisAccentGreen,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "CONTROL DE DISPOSITIVO",
+                                        color = JarvisAccentGreen,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onDeviceControlClick()
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Memory,
+                                        contentDescription = null,
+                                        tint = JarvisAccentCyan,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "MEMORIA PERSISTENTE",
+                                        color = JarvisAccentCyan,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onMemoryClick()
+                            }
+                        )
+
                         DropdownMenuItem(
                             text = {
                                 Row(
@@ -809,9 +947,14 @@ private fun NoModelLoadedBanner(
 private fun EmptyChatPlaceholder(
     isModelLoaded: Boolean,
     modelName: String?,
+    docsCount: Int = 0,
     onConfigureModelClick: () -> Unit,
     onOpenLiveMode: () -> Unit,
     onPickDocument: () -> Unit,
+    onOpenDocuments: () -> Unit,
+    onOpenDeviceControl: () -> Unit,
+    onOpenAgentPlanner: () -> Unit,
+    onOpenMemory: () -> Unit,
     onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -912,7 +1055,7 @@ private fun EmptyChatPlaceholder(
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = "¿En qué puedo ayudarte hoy? Escribe un mensaje, dicta con voz o sube un documento para comenzar.",
+            text = "¿En qué puedo ayudarte hoy? Escribe un mensaje, dicta con voz, usa los comandos rápidos o explora las funciones integradas.",
             color = JarvisTextSecondary,
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
@@ -920,13 +1063,14 @@ private fun EmptyChatPlaceholder(
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // Quick Capabilities Grid (2x2)
+        // Comprehensive Tactical Capabilities Grid (3 rows x 2 columns)
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Row 1: Live Voice & Segundo Cerebro
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -941,40 +1085,66 @@ private fun EmptyChatPlaceholder(
                 )
 
                 TacticalFeatureCard(
-                    title = "Modelos & Claves",
-                    subtitle = "Configuración y proveedores",
-                    icon = Icons.Default.Settings,
-                    accentColor = JarvisPrimaryLight,
-                    onClick = onConfigureModelClick,
+                    title = "Segundo Cerebro",
+                    subtitle = if (docsCount > 0) "$docsCount documentos aprendidos" else "Subir y aprender de docs",
+                    icon = Icons.Default.Description,
+                    accentColor = Color(0xFF64B5F6),
+                    onClick = onOpenDocuments,
                     modifier = Modifier.weight(1f)
                 )
             }
 
+            // Row 2: Control Móvil & Planificador Agéntico
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TacticalFeatureCard(
-                    title = "Leer Documentos",
-                    subtitle = "Preguntas sobre archivos",
-                    icon = Icons.Default.Description,
-                    accentColor = Color(0xFF64B5F6),
-                    onClick = onPickDocument,
+                    title = "Control Móvil",
+                    subtitle = "Linterna, audio, apps, alarmas",
+                    icon = Icons.Default.Smartphone,
+                    accentColor = JarvisAccentGreen,
+                    onClick = onOpenDeviceControl,
                     modifier = Modifier.weight(1f)
                 )
 
                 TacticalFeatureCard(
-                    title = "Historial de Chats",
-                    subtitle = "Conversaciones anteriores",
-                    icon = Icons.Default.FolderOpen,
-                    accentColor = Color(0xFF81C784),
-                    onClick = onOpenHistory,
+                    title = "Plan Agéntico",
+                    subtitle = "Descomposición autónoma",
+                    icon = Icons.Default.AutoAwesome,
+                    accentColor = JarvisPrimaryLight,
+                    onClick = onOpenAgentPlanner,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Row 3: Memoria a Largo Plazo & Modelos
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TacticalFeatureCard(
+                    title = "Memoria del Núcleo",
+                    subtitle = "Datos personales clave",
+                    icon = Icons.Default.Memory,
+                    accentColor = Color(0xFFCE93D8),
+                    onClick = onOpenMemory,
+                    modifier = Modifier.weight(1f)
+                )
+
+                TacticalFeatureCard(
+                    title = "Modelos & Claves",
+                    subtitle = "Configurar proveedores IA",
+                    icon = Icons.Default.Settings,
+                    accentColor = JarvisAccentOrange,
+                    onClick = onConfigureModelClick,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
     }
 }
+
 
 @Composable
 private fun TacticalFeatureCard(
@@ -987,10 +1157,10 @@ private fun TacticalFeatureCard(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = JarvisSurfaceElevated,
-        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder),
-        modifier = modifier.height(86.dp)
+        border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.3f)),
+        modifier = modifier.height(92.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1003,17 +1173,25 @@ private fun TacticalFeatureCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .size(6.dp)
                         .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.5f))
+                        .background(accentColor.copy(alpha = 0.7f))
                 )
             }
 
@@ -1021,7 +1199,7 @@ private fun TacticalFeatureCard(
                 Text(
                     text = title,
                     color = JarvisTextPrimary,
-                    fontSize = 12.sp,
+                    fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
                     maxLines = 1

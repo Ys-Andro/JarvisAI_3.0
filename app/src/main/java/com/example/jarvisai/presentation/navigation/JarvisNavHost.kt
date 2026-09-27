@@ -53,6 +53,15 @@ fun JarvisNavHost(
                 },
                 onNavigateToAgentPlanner = {
                     navController.navigate(Screen.AgentPlanner.route)
+                },
+                onNavigateToDocuments = {
+                    navController.navigate(Screen.Documents.route)
+                },
+                onNavigateToDeviceControl = {
+                    navController.navigate(Screen.DeviceControl.route)
+                },
+                onNavigateToMemory = {
+                    navController.navigate(Screen.Memory.route)
                 }
             )
         }
