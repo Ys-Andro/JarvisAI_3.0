@@ -22,6 +22,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import com.example.jarvisai.ui.mascot.JarvisMascot
+import com.example.jarvisai.ui.mascot.MascotController
 import com.example.jarvisai.ui.mascot.MascotExpression
 import com.example.jarvisai.ui.mascot.MascotState
 import androidx.compose.foundation.background
@@ -294,10 +295,19 @@ fun ChatScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
+                                val chatMascotController = remember { MascotController() }
+                                LaunchedEffect(uiState.isGenerating, uiState.isSpeakingTts) {
+                                    chatMascotController.updateForChat(uiState.isGenerating, uiState.isSpeakingTts)
+                                }
+                                val chatState by chatMascotController.state.collectAsState()
+                                val chatExpr by chatMascotController.expression.collectAsState()
+                                val chatAmp by chatMascotController.audioAmplitude.collectAsState()
+
                                 JarvisMascot(
-                                    state = if (uiState.isSpeakingTts) MascotState.SPEAKING else MascotState.THINKING,
-                                    expression = if (uiState.isSpeakingTts) MascotExpression.FELIZ else MascotExpression.PENSANDO,
-                                    size = 54.dp
+                                    state = chatState,
+                                    expression = chatExpr,
+                                    size = 54.dp,
+                                    audioAmplitude = chatAmp
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
@@ -634,42 +644,6 @@ private fun ChatTopBar(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.8.sp
-                        )
-                    }
-                }
-
-                // Documents / Segundo Cerebro Quick Button
-                Surface(
-                    onClick = onDocumentsClick,
-                    shape = CircleShape,
-                    color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF64B5F6).copy(alpha = 0.7f)),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Description,
-                            contentDescription = "Documentos y Segundo Cerebro",
-                            tint = Color(0xFF64B5F6),
-                            modifier = Modifier.size(17.dp)
-                        )
-                    }
-                }
-
-                // Device Control Quick Button
-                Surface(
-                    onClick = onDeviceControlClick,
-                    shape = CircleShape,
-                    color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentGreen.copy(alpha = 0.7f)),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Smartphone,
-                            contentDescription = "Control de Dispositivo",
-                            tint = JarvisAccentGreen,
-                            modifier = Modifier.size(17.dp)
                         )
                     }
                 }

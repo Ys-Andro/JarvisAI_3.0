@@ -57,10 +57,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.example.jarvisai.ui.mascot.MascotController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -128,18 +130,13 @@ fun FloatingBubbleOrb(
         label = "pulse"
     )
 
-    val mascotState = when {
-        isListening -> MascotState.LISTENING
-        isSpeaking -> MascotState.SPEAKING
-        isThinking -> MascotState.THINKING
-        else -> MascotState.IDLE
+    val mascotController = remember { MascotController() }
+    LaunchedEffect(isListening, isSpeaking, isThinking) {
+        mascotController.updateForFloating(isListening, isSpeaking, isThinking)
     }
-    val mascotExpression = when {
-        isListening -> MascotExpression.CURIOSO
-        isSpeaking -> MascotExpression.FELIZ
-        isThinking -> MascotExpression.PENSANDO
-        else -> MascotExpression.SERENO
-    }
+    val mascotState by mascotController.state.collectAsState()
+    val mascotExpression by mascotController.expression.collectAsState()
+    val mascotAmplitude by mascotController.audioAmplitude.collectAsState()
 
     Box(
         modifier = modifier
@@ -389,18 +386,12 @@ fun FloatingOverlayHud(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val hudMascotState = when {
-                            isListening -> MascotState.LISTENING
-                            isSpeaking -> MascotState.SPEAKING
-                            isThinking -> MascotState.THINKING
-                            else -> MascotState.IDLE
+                        val hudMascotController = remember { MascotController() }
+                        LaunchedEffect(isListening, isSpeaking, isThinking) {
+                            hudMascotController.updateForFloating(isListening, isSpeaking, isThinking)
                         }
-                        val hudMascotExpr = when {
-                            isListening -> MascotExpression.CURIOSO
-                            isSpeaking -> MascotExpression.FELIZ
-                            isThinking -> MascotExpression.PENSANDO
-                            else -> MascotExpression.SERENO
-                        }
+                        val hudMascotState by hudMascotController.state.collectAsState()
+                        val hudMascotExpr by hudMascotController.expression.collectAsState()
 
                         JarvisMascot(
                             state = hudMascotState,

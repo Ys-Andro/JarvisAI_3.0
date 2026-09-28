@@ -70,6 +70,7 @@ import com.example.jarvisai.domain.voice.LiveVoicePhase
 import com.example.jarvisai.presentation.settings.components.VOICE_OPTIONS
 import com.example.jarvisai.presentation.settings.components.VOICE_PRESETS
 import com.example.jarvisai.ui.mascot.JarvisMascot
+import com.example.jarvisai.ui.mascot.MascotController
 import com.example.jarvisai.ui.mascot.MascotExpression
 import com.example.jarvisai.ui.mascot.MascotState
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
@@ -215,31 +216,19 @@ fun JarvisLiveModeDialog(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.weight(1f)
                 ) {
-                    val mascotState = when {
-                        sessionState.isMuted -> MascotState.IDLE
-                        sessionState.phase is LiveVoicePhase.Speaking -> MascotState.SPEAKING
-                        sessionState.phase is LiveVoicePhase.Processing -> MascotState.THINKING
-                        sessionState.phase is LiveVoicePhase.Listening || sessionState.phase is LiveVoicePhase.UserSpeaking -> MascotState.LISTENING
-                        sessionState.phase is LiveVoicePhase.Interrupted -> MascotState.LISTENING
-                        sessionState.phase is LiveVoicePhase.Error -> MascotState.ERROR
-                        else -> MascotState.LIVE
+                    val mascotController = remember { MascotController() }
+                    LaunchedEffect(sessionState.phase, sessionState.audioAmplitude, sessionState.isMuted, isSpeaking) {
+                        mascotController.updateFromSession(sessionState.phase, sessionState.audioAmplitude, sessionState.isMuted, isSpeaking)
                     }
-
-                    val mascotExpression = when (sessionState.phase) {
-                        is LiveVoicePhase.Speaking -> MascotExpression.FELIZ
-                        is LiveVoicePhase.Processing -> MascotExpression.PENSANDO
-                        is LiveVoicePhase.UserSpeaking -> if (sessionState.audioAmplitude > 0.35f) MascotExpression.ASOMBRADO else MascotExpression.CURIOSO
-                        is LiveVoicePhase.Listening -> MascotExpression.CURIOSO
-                        is LiveVoicePhase.Interrupted -> MascotExpression.SORPRENDIDO
-                        is LiveVoicePhase.Error -> MascotExpression.TRISTE
-                        else -> if (sessionState.isMuted) MascotExpression.SERENO else MascotExpression.FELIZ
-                    }
+                    val mascotState by mascotController.state.collectAsState()
+                    val mascotExpression by mascotController.expression.collectAsState()
+                    val mascotAmplitude by mascotController.audioAmplitude.collectAsState()
 
                     JarvisMascot(
                         state = mascotState,
                         expression = mascotExpression,
                         size = 260.dp,
-                        audioAmplitude = if (isSpeaking) 0.7f else sessionState.audioAmplitude,
+                        audioAmplitude = mascotAmplitude,
                         onClick = {
                             if (isSpeaking) {
                                 liveEngine.interrupt()
