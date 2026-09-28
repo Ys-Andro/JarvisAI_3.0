@@ -18,6 +18,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import com.example.jarvisai.ui.mascot.JarvisMascot
+import com.example.jarvisai.ui.mascot.MascotExpression
+import com.example.jarvisai.ui.mascot.MascotState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -269,6 +275,47 @@ fun ChatScreen(
                         )
                     }
 
+                    // Active Mascot Companion Presence (Speaks / Thinks contextual indicator)
+                    AnimatedVisibility(
+                        visible = uiState.isGenerating || uiState.isSpeakingTts,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = JarvisSurfaceElevated,
+                            border = BorderStroke(1.dp, JarvisPrimary.copy(alpha = 0.45f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                JarvisMascot(
+                                    state = if (uiState.isSpeakingTts) MascotState.SPEAKING else MascotState.THINKING,
+                                    expression = if (uiState.isSpeakingTts) MascotExpression.FELIZ else MascotExpression.PENSANDO,
+                                    size = 54.dp
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (uiState.isSpeakingTts) "JARVIS RESPONDIENDO..." else "JARVIS PENSANDO...",
+                                        color = JarvisPrimary,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (uiState.isSpeakingTts) "Voz activa en tiempo real..." else "Procesando razonamiento y conectando datos...",
+                                        color = JarvisTextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     ChatInputBar(
                         inputText = uiState.inputPrompt,
@@ -977,43 +1024,27 @@ private fun EmptyChatPlaceholder(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Holographic Arc Reactor Core Hub
-        Box(
-            modifier = Modifier
-                .size((88 * orbScale).dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            JarvisPrimary.copy(alpha = 0.35f),
-                            Color(0xFF003846).copy(alpha = 0.6f),
-                            JarvisSurfaceElevated
-                        )
-                    )
-                )
-                .border(
-                    2.dp,
-                    Brush.sweepGradient(
-                        listOf(
-                            JarvisPrimary,
-                            JarvisPrimaryLight,
-                            JarvisBorderGlow,
-                            JarvisPrimary
-                        )
-                    ),
-                    CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Memory,
-                contentDescription = null,
-                tint = JarvisPrimary,
-                modifier = Modifier.size(42.dp)
-            )
-        }
+        // JARVIS 3.0 Visual Mascot Protagonist
+        var mascotExpression by remember { mutableStateOf(MascotExpression.SERENO) }
+        var tapCount by remember { mutableStateOf(0) }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        JarvisMascot(
+            state = if (!isModelLoaded) MascotState.IDLE else MascotState.IDLE,
+            expression = mascotExpression,
+            size = 175.dp,
+            onClick = {
+                tapCount++
+                mascotExpression = when (tapCount % 5) {
+                    0 -> MascotExpression.SERENO
+                    1 -> MascotExpression.FELIZ
+                    2 -> MascotExpression.CURIOSO
+                    3 -> MascotExpression.EMOCIONADO
+                    else -> MascotExpression.ASOMBRADO
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // System Title & Status Pill
         Row(

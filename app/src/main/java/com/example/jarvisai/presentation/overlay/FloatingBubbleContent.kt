@@ -92,6 +92,9 @@ import com.example.jarvisai.ui.theme.JarvisSurfaceVariant
 import com.example.jarvisai.ui.theme.JarvisTextPrimary
 import com.example.jarvisai.ui.theme.JarvisTextSecondary
 import com.example.jarvisai.ui.theme.JarvisTextTertiary
+import com.example.jarvisai.ui.mascot.JarvisMascot
+import com.example.jarvisai.ui.mascot.MascotExpression
+import com.example.jarvisai.ui.mascot.MascotState
 
 /**
  * Compact Floating Bubble Orb representation with enhanced futuristic aesthetics.
@@ -125,9 +128,22 @@ fun FloatingBubbleOrb(
         label = "pulse"
     )
 
+    val mascotState = when {
+        isListening -> MascotState.LISTENING
+        isSpeaking -> MascotState.SPEAKING
+        isThinking -> MascotState.THINKING
+        else -> MascotState.IDLE
+    }
+    val mascotExpression = when {
+        isListening -> MascotExpression.CURIOSO
+        isSpeaking -> MascotExpression.FELIZ
+        isThinking -> MascotExpression.PENSANDO
+        else -> MascotExpression.SERENO
+    }
+
     Box(
         modifier = modifier
-            .size(66.dp)
+            .size(68.dp)
             .clip(CircleShape)
             .background(
                 Brush.radialGradient(
@@ -152,63 +168,10 @@ fun FloatingBubbleOrb(
             .testTag("floating_bubble_orb"),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val center = Offset(size.width / 2f, size.height / 2f)
-            val radius = (size.minDimension / 2.2f) * if (isListening || isThinking || isSpeaking) pulse else 1f
-
-            // Outer energy glow ring
-            drawCircle(
-                color = when {
-                    isListening -> JarvisAccentCyan.copy(alpha = 0.45f)
-                    isThinking -> JarvisAccentOrange.copy(alpha = 0.45f)
-                    isSpeaking -> JarvisAccentGreen.copy(alpha = 0.45f)
-                    else -> JarvisPrimary.copy(alpha = 0.3f)
-                },
-                radius = radius,
-                center = center
-            )
-
-            // Inner orbital line
-            drawCircle(
-                color = JarvisPrimary,
-                radius = radius * 0.78f,
-                center = center,
-                style = Stroke(width = 2.5f)
-            )
-
-            // Center Arc-Reactor Core
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color.White,
-                        JarvisAccentCyan,
-                        JarvisPrimary,
-                        Color.Transparent
-                    ),
-                    center = center,
-                    radius = radius * 0.5f
-                ),
-                radius = radius * 0.5f,
-                center = center
-            )
-        }
-
-        // Mini status icon
-        Icon(
-            imageVector = when {
-                isListening -> Icons.Default.Mic
-                isThinking -> Icons.Default.GraphicEq
-                isSpeaking -> Icons.Default.GraphicEq
-                else -> Icons.Default.GraphicEq
-            },
-            contentDescription = "Jarvis Orb",
-            tint = when {
-                isListening -> Color(0xFF00E5FF)
-                isSpeaking -> JarvisAccentGreen
-                isThinking -> JarvisAccentOrange
-                else -> JarvisPrimaryLight
-            },
-            modifier = Modifier.size(22.dp)
+        JarvisMascot(
+            state = mascotState,
+            expression = mascotExpression,
+            size = 56.dp
         )
     }
 }
@@ -426,23 +389,23 @@ fun FloatingOverlayHud(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(14.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    when {
-                                        isListening -> JarvisAccentCyan
-                                        isThinking -> JarvisAccentOrange
-                                        isSpeaking -> JarvisAccentGreen
-                                        else -> JarvisPrimary
-                                    }
-                                )
-                                .border(
-                                    width = 2.dp,
-                                    color = (if (isListening) JarvisAccentCyan else JarvisPrimary).copy(alpha = 0.6f),
-                                    shape = CircleShape
-                                )
+                        val hudMascotState = when {
+                            isListening -> MascotState.LISTENING
+                            isSpeaking -> MascotState.SPEAKING
+                            isThinking -> MascotState.THINKING
+                            else -> MascotState.IDLE
+                        }
+                        val hudMascotExpr = when {
+                            isListening -> MascotExpression.CURIOSO
+                            isSpeaking -> MascotExpression.FELIZ
+                            isThinking -> MascotExpression.PENSANDO
+                            else -> MascotExpression.SERENO
+                        }
+
+                        JarvisMascot(
+                            state = hudMascotState,
+                            expression = hudMascotExpr,
+                            size = 44.dp
                         )
 
                         Column {

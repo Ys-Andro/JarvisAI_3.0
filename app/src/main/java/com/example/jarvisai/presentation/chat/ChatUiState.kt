@@ -30,6 +30,8 @@ data class ChatUiState(
     val settings: com.example.jarvisai.domain.model.GenerationSettings = com.example.jarvisai.domain.model.GenerationSettings(),
     val errorMessage: String? = null
 ) {
+    val isGenerating: Boolean get() = inferenceStatus is ChatInferenceStatus.Generating
+
     fun isProviderReady(provider: ModelProvider): Boolean {
         if (provider == ModelProvider.GEMINI) {
             val provKey = providerApiKeys["gemini"]

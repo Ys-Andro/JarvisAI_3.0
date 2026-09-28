@@ -69,6 +69,9 @@ import com.example.jarvisai.domain.voice.ILiveVoiceEngine
 import com.example.jarvisai.domain.voice.LiveVoicePhase
 import com.example.jarvisai.presentation.settings.components.VOICE_OPTIONS
 import com.example.jarvisai.presentation.settings.components.VOICE_PRESETS
+import com.example.jarvisai.ui.mascot.JarvisMascot
+import com.example.jarvisai.ui.mascot.MascotExpression
+import com.example.jarvisai.ui.mascot.MascotState
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
 import com.example.jarvisai.ui.theme.JarvisAccentRed
 import com.example.jarvisai.ui.theme.JarvisBackground
@@ -206,16 +209,37 @@ fun JarvisLiveModeDialog(
                     }
                 }
 
-                // Center Reactive Orb Visualizer
+                // Center Mascot Visualizer (Official Companion Protagonist)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.weight(1f)
                 ) {
-                    GeminiLiveOrbVisualizer(
-                        isListening = isListening && !sessionState.isMuted,
-                        isJarvisSpeaking = isSpeaking,
-                        audioAmplitude = if (isSpeaking) 0.75f else sessionState.audioAmplitude,
+                    val mascotState = when {
+                        sessionState.isMuted -> MascotState.IDLE
+                        sessionState.phase is LiveVoicePhase.Speaking -> MascotState.SPEAKING
+                        sessionState.phase is LiveVoicePhase.Processing -> MascotState.THINKING
+                        sessionState.phase is LiveVoicePhase.Listening || sessionState.phase is LiveVoicePhase.UserSpeaking -> MascotState.LISTENING
+                        sessionState.phase is LiveVoicePhase.Interrupted -> MascotState.LISTENING
+                        sessionState.phase is LiveVoicePhase.Error -> MascotState.ERROR
+                        else -> MascotState.LIVE
+                    }
+
+                    val mascotExpression = when (sessionState.phase) {
+                        is LiveVoicePhase.Speaking -> MascotExpression.FELIZ
+                        is LiveVoicePhase.Processing -> MascotExpression.PENSANDO
+                        is LiveVoicePhase.UserSpeaking -> if (sessionState.audioAmplitude > 0.35f) MascotExpression.ASOMBRADO else MascotExpression.CURIOSO
+                        is LiveVoicePhase.Listening -> MascotExpression.CURIOSO
+                        is LiveVoicePhase.Interrupted -> MascotExpression.SORPRENDIDO
+                        is LiveVoicePhase.Error -> MascotExpression.TRISTE
+                        else -> if (sessionState.isMuted) MascotExpression.SERENO else MascotExpression.FELIZ
+                    }
+
+                    JarvisMascot(
+                        state = mascotState,
+                        expression = mascotExpression,
+                        size = 260.dp,
+                        audioAmplitude = if (isSpeaking) 0.7f else sessionState.audioAmplitude,
                         onClick = {
                             if (isSpeaking) {
                                 liveEngine.interrupt()
@@ -229,7 +253,7 @@ fun JarvisLiveModeDialog(
                         }
                     )
 
-                    Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     // Dynamic Phase Prompt
                     Text(
