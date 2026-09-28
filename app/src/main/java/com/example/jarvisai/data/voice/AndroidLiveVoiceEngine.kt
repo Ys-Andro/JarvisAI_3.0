@@ -59,11 +59,17 @@ class AndroidLiveVoiceEngine(
                 if (!isSpeaking && _sessionState.value.phase is LiveVoicePhase.Speaking) {
                     // Finished speaking response -> Return smoothly to continuous listening if not muted
                     if (!_sessionState.value.isMuted) {
+                        _sessionState.update {
+                            it.copy(
+                                phase = LiveVoicePhase.Listening,
+                                statusLabel = "Escuchando... Puedes hablar"
+                            )
+                        }
                         mainHandler.postDelayed({
-                            if (!_sessionState.value.isMuted && _sessionState.value.phase !is LiveVoicePhase.Speaking) {
+                            if (!_sessionState.value.isMuted && _sessionState.value.phase is LiveVoicePhase.Listening && !isListeningActive) {
                                 startListening()
                             }
-                        }, 500)
+                        }, 250)
                     } else {
                         _sessionState.update { it.copy(phase = LiveVoicePhase.Idle, statusLabel = "Micrófono en pausa") }
                     }
