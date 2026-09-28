@@ -55,7 +55,10 @@ class JarvisViewModelFactory(
             modelClass.isAssignableFrom(AutonomousAgentPlannerViewModel::class.java) -> {
                 AutonomousAgentPlannerViewModel(
                     inferenceRepository = appContainer.inferenceRepository,
-                    settingsRepository = appContainer.settingsRepository
+                    settingsRepository = appContainer.settingsRepository,
+                    context = context,
+                    memoryRepository = appContainer.memoryRepository,
+                    documentRepository = appContainer.documentRepository
                 ) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

@@ -122,38 +122,8 @@ class GeminiInferenceRepository(
         val memories = memoryRepository.getAllMemories().first()
         val documents = documentRepository.getAllDocuments().first()
 
-        val memoryContext = if (memories.isNotEmpty()) {
-            buildString {
-                append("\n\n[MEMORIA A LARGO PLAZO Y DATOS RELEVANTES DEL USUARIO]:\n")
-                for (m in memories) {
-                    append("- [ID ${m.id}] ${m.key}: ${m.value} (${m.category})\n")
-                }
-            }
-        } else ""
-
-        val documentKnowledgeContext = if (documents.isNotEmpty()) {
-            buildString {
-                append("\n\n[BASE DE CONOCIMIENTO CENTRALIZADA - SEGUNDO CEREBRO (DOCUMENTOS APRENDIDOS Y GUARDADOS)]:\n")
-                append("El usuario ha subido los siguientes documentos a tu núcleo para que aprendas de ellos y extraigas información. Tienes acceso total a su contenido para responder preguntas, resumir, cruzar datos y asesorar al usuario:")
-                var totalChars = 0
-                val maxDocChars = 22000
-                for (doc in documents) {
-                    if (totalChars >= maxDocChars) {
-                        append("\n... (Y ${documents.size} documentos en total indexados en tu base de datos)")
-                        break
-                    }
-                    val snippet = if (doc.content.length > 4500) {
-                        doc.content.take(4500) + "\n...[Extracto adicional indexado]"
-                    } else {
-                        doc.content
-                    }
-                    totalChars += snippet.length
-                    append("\n\n=== DOCUMENTO: \"${doc.title}\" (${doc.fileType}) ===\n")
-                    append(snippet)
-                    append("\n==================================================")
-                }
-            }
-        } else ""
+        val contextProvider = com.example.jarvisai.data.rag.ContextProvider()
+        val ragAugmentedContext = contextProvider.buildAugmentedContext(prompt, documents, memories)
 
         val combinedSystemPrompt = buildString {
             append(agent.systemPrompt)
@@ -161,8 +131,7 @@ class GeminiInferenceRepository(
             if (userPrompt.isNotBlank() && !userPrompt.contains("You are Jarvis") && userPrompt != "Eres Jarvis, un asistente de IA avanzado, eficiente, sofisticado y servicial inspirado en el asistente de Iron Man.") {
                 append("\n\n$userPrompt")
             }
-            append(memoryContext)
-            append(documentKnowledgeContext)
+            append(ragAugmentedContext)
             append("""
                 
                 [CAPACIDAD DE CONTROL TOTAL DEL DISPOSITIVO Y AUTOMATIZACIÓN - JARVIS DEVICE AGENT]:
@@ -251,65 +220,10 @@ class GeminiInferenceRepository(
         }
 
         val finalResponse = accumulatedText.toString()
-        val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[\\s\\S]*?\\})\\]".toRegex()
-        val actionMatches = actionRegex.findAll(finalResponse).toList()
-
-        if (actionMatches.isNotEmpty()) {
-            for (match in actionMatches) {
-                val jsonPayload = match.groupValues[1]
-                try {
-                    val json = org.json.JSONObject(jsonPayload)
-                    val actionType = json.optString("action").uppercase()
-
-                    when (actionType) {
-                        "SAVE_MEMORY" -> {
-                            val key = json.optString("key", "Dato").trim()
-                            val value = json.optString("value", "").trim()
-                            val category = json.optString("category", "GENERAL").trim().uppercase()
-                            if (key.isNotBlank() && value.isNotBlank()) {
-                                memoryRepository.saveMemory(key, value, category)
-                                emit("\n\n✓ Guardado en tu memoria a largo plazo: \"$key\" = \"$value\" [$category]")
-                            }
-                        }
-                        "DELETE_MEMORY" -> {
-                            val id = json.optLong("id", -1L)
-                            if (id > 0) {
-                                memoryRepository.deleteMemory(id)
-                                emit("\n\n✓ Memoria eliminada del núcleo.")
-                            }
-                        }
-                        else -> {
-                            val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
-                            emit("\n\n✓ $actionResultMsg")
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error executing action: $jsonPayload", e)
-                }
-            }
-        } else if (finalResponse.contains("\"action\"")) {
-            // Fallback for markdown json blocks without explicit [JARVIS_ACTION: tag
-            val jsonCodeRegex = "```(?:json)?\\s*(\\{[\\s\\S]*?\"action\"[\\s\\S]*?\\})\\s*```".toRegex()
-            val codeMatch = jsonCodeRegex.find(finalResponse)
-            if (codeMatch != null) {
-                val jsonPayload = codeMatch.groupValues[1]
-                try {
-                    val json = org.json.JSONObject(jsonPayload)
-                    val actionType = json.optString("action").uppercase()
-                    if (actionType == "SAVE_MEMORY") {
-                        val key = json.optString("key", "Dato").trim()
-                        val value = json.optString("value", "").trim()
-                        val category = json.optString("category", "GENERAL").trim().uppercase()
-                        if (key.isNotBlank() && value.isNotBlank()) {
-                            memoryRepository.saveMemory(key, value, category)
-                            emit("\n\n✓ Guardado en tu memoria a largo plazo: \"$key\" = \"$value\" [$category]")
-                        }
-                    } else {
-                        val actionResultMsg = DeviceController.executeActionCommand(context, jsonPayload)
-                        emit("\n\n✓ $actionResultMsg")
-                    }
-                } catch (_: Exception) {}
-            }
+        val actionExecutor = com.example.jarvisai.data.action.ActionExecutor(context, memoryRepository)
+        val actionParser = com.example.jarvisai.data.action.ActionParser()
+        actionParser.extractAndExecute(finalResponse, actionExecutor) { resultMsg ->
+            emit(resultMsg)
         }
     }
         .onStart {

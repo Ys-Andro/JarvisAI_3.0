@@ -90,7 +90,7 @@ fun AutonomousAgentPlannerScreen(
                     }
                 },
                 actions = {
-                    if (uiState.finalSynthesis != null || uiState.steps.isNotEmpty()) {
+                    if (uiState.finalSynthesis != null || uiState.tasks.isNotEmpty()) {
                         IconButton(onClick = { viewModel.resetPlan() }) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
@@ -211,7 +211,7 @@ fun AutonomousAgentPlannerScreen(
             }
 
             // Steps & Execution Pipeline
-            if (uiState.steps.isNotEmpty()) {
+            if (uiState.tasks.isNotEmpty()) {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -220,7 +220,7 @@ fun AutonomousAgentPlannerScreen(
                 ) {
                     item {
                         Text(
-                            text = "FLUJO COGNITIVO Y SUB-TAREAS",
+                            text = "FLUJO COGNITIVO Y TAREAS AGÉNTICAS",
                             color = JarvisTextTertiary,
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
@@ -229,7 +229,7 @@ fun AutonomousAgentPlannerScreen(
                         )
                     }
 
-                    items(uiState.steps) { step ->
+                    items(uiState.tasks) { task ->
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -248,22 +248,23 @@ fun AutonomousAgentPlannerScreen(
                                         .size(28.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            when (step.status) {
-                                                StepStatus.COMPLETED -> JarvisAccentGreen.copy(alpha = 0.2f)
-                                                StepStatus.RUNNING -> JarvisAccentCyan.copy(alpha = 0.2f)
+                                            when (task.status) {
+                                                com.example.jarvisai.data.agent.TaskStatus.COMPLETED -> JarvisAccentGreen.copy(alpha = 0.2f)
+                                                com.example.jarvisai.data.agent.TaskStatus.RUNNING -> JarvisAccentCyan.copy(alpha = 0.2f)
+                                                com.example.jarvisai.data.agent.TaskStatus.FAILED -> JarvisAccentRed.copy(alpha = 0.2f)
                                                 else -> JarvisSurfaceVariant
                                             }
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (step.status == StepStatus.COMPLETED) {
+                                    if (task.status == com.example.jarvisai.data.agent.TaskStatus.COMPLETED) {
                                         Icon(
                                             imageVector = Icons.Default.CheckCircle,
                                             contentDescription = null,
                                             tint = JarvisAccentGreen,
                                             modifier = Modifier.size(16.dp)
                                         )
-                                    } else if (step.status == StepStatus.RUNNING) {
+                                    } else if (task.status == com.example.jarvisai.data.agent.TaskStatus.RUNNING) {
                                         CircularProgressIndicator(
                                             modifier = Modifier.size(14.dp),
                                             strokeWidth = 2.dp,
@@ -280,16 +281,34 @@ fun AutonomousAgentPlannerScreen(
                                 }
 
                                 Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = task.title,
+                                            color = JarvisTextPrimary,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                        Text(
+                                            text = task.status.name,
+                                            color = when (task.status) {
+                                                com.example.jarvisai.data.agent.TaskStatus.COMPLETED -> JarvisAccentGreen
+                                                com.example.jarvisai.data.agent.TaskStatus.RUNNING -> JarvisAccentCyan
+                                                com.example.jarvisai.data.agent.TaskStatus.FAILED -> JarvisAccentRed
+                                                else -> JarvisTextTertiary
+                                            },
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                     Text(
-                                        text = step.title,
-                                        color = JarvisTextPrimary,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                    Text(
-                                        text = step.description,
-                                        color = JarvisTextSecondary,
+                                        text = task.error ?: task.outputResult ?: task.description,
+                                        color = if (task.error != null) JarvisAccentRed else JarvisTextSecondary,
                                         fontSize = 10.5.sp
                                     )
                                 }

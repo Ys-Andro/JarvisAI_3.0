@@ -13,6 +13,7 @@ import com.example.jarvisai.data.repository.AndroidTtsRepository
 import com.example.jarvisai.data.repository.ConversationRepositoryImpl
 import com.example.jarvisai.data.repository.DocumentRepositoryImpl
 import com.example.jarvisai.data.repository.GeminiInferenceRepository
+import com.example.jarvisai.data.repository.GoogleCloudTtsRepository
 import com.example.jarvisai.data.repository.MemoryRepositoryImpl
 import com.example.jarvisai.data.repository.SettingsRepositoryImpl
 import com.example.jarvisai.data.util.NetworkMonitor
@@ -84,8 +85,16 @@ class AppContainer(private val context: Context) {
         GeminiInferenceRepository(context, geminiApiClient, universalApiClient, settingsRepository, memoryRepository, documentRepository)
     }
 
-    val ttsRepository: ITtsRepository by lazy {
+    val androidTtsRepository: AndroidTtsRepository by lazy {
         AndroidTtsRepository(context, settingsRepository)
+    }
+
+    val googleCloudTtsRepository: GoogleCloudTtsRepository by lazy {
+        GoogleCloudTtsRepository(context, settingsRepository, androidTtsRepository)
+    }
+
+    val ttsRepository: ITtsRepository by lazy {
+        googleCloudTtsRepository
     }
 
     val liveVoiceEngine: com.example.jarvisai.domain.voice.ILiveVoiceEngine by lazy {
