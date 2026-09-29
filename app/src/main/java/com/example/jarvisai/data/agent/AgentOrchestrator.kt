@@ -41,15 +41,23 @@ class AgentOrchestrator(
         goal: String,
         conversationId: String? = null,
         conversationHistory: List<Message> = emptyList(),
+        imageBase64: String? = null,
+        imageMimeType: String? = null,
         onTaskUpdate: (List<AgentTask>) -> Unit = {}
     ): String {
-        val initialTasks = createInitialPlan(goal, conversationId, conversationHistory)
+        val initialTasks = createInitialPlan(goal, conversationId, conversationHistory, imageBase64, imageMimeType)
             ?: return "No pude construir un plan ejecutable para esa solicitud."
         if (initialTasks.isEmpty()) return "No encontré una acción o herramienta necesaria para completar esa solicitud."
         return runPlan(initialTasks, goal, conversationId, onTaskUpdate)
     }
 
-    private suspend fun createInitialPlan(goal: String, conversationId: String?, conversationHistory: List<Message>): List<AgentTask>? {
+    private suspend fun createInitialPlan(
+        goal: String,
+        conversationId: String?,
+        conversationHistory: List<Message>,
+        imageBase64: String? = null,
+        imageMimeType: String? = null
+    ): List<AgentTask>? {
         val settings = settingsRepository.getSettings().first()
         val actionCatalog = ActionRegistry.SUPPORTED_ACTIONS.sorted().joinToString(", ")
         val context = contextManager.build(goal, conversationId, conversationHistory)
@@ -60,6 +68,9 @@ class AgentOrchestrator(
             El usuario puede usar referencias como "el segundo", "eso", "lo mismo",
             "ahora hazlo", "el anterior" o "esa configuración". Resuelve esas referencias
             usando el contexto proporcionado antes de crear el plan.
+            Si hay una imagen adjunta, úsala como evidencia visual para comprender el objetivo,
+            identificar elementos, aplicaciones, texto, botones u objetos visibles antes de
+            seleccionar una acción. No inventes información que no sea visible.
 
             ${context.toPromptBlock()}
 
@@ -84,7 +95,13 @@ class AgentOrchestrator(
         """.trimIndent()
         return try {
             val response = StringBuilder()
-            inferenceRepository.generateCompletionStream(plannerPrompt, context.conversation, settings).collect { response.append(it) }
+            inferenceRepository.generateCompletionStream(
+                prompt = plannerPrompt,
+                conversationHistory = context.conversation,
+                settings = settings,
+                imageBase64 = imageBase64,
+                imageMimeType = imageMimeType
+            ).collect { response.append(it) }
             parseInitialPlan(response.toString())
         } catch (_: Exception) { null }
     }
