@@ -25,6 +25,7 @@ data class AgentPlannerUiState(
 )
 
 class AutonomousAgentPlannerViewModel(
+    private val conversationRepository: com.example.jarvisai.domain.repository.IConversationRepository,
     private val inferenceRepository: IInferenceRepository,
     private val settingsRepository: ISettingsRepository,
     private val context: Context,
@@ -37,6 +38,7 @@ class AutonomousAgentPlannerViewModel(
 
     private val orchestrator = AgentOrchestrator(
         context = context,
+        conversationRepository = conversationRepository,
         memoryRepository = memoryRepository,
         documentRepository = documentRepository,
         inferenceRepository = inferenceRepository,
