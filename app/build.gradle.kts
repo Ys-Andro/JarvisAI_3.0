@@ -11,7 +11,7 @@ android {
 
   defaultConfig {
     applicationId = "com.aistudio.jarvisai.anzqdm"
-    minSdk = 26
+    minSdk = 30
     targetSdk = 35
     versionCode = System.getenv("JARVIS_VERSION_CODE")?.toIntOrNull() ?: 1
     versionName = providers.environmentVariable("JARVIS_VERSION_NAME")
