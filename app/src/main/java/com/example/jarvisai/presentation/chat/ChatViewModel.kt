@@ -469,7 +469,7 @@ class ChatViewModel(
     private fun shouldUseAgent(prompt: String): Boolean {
         val normalized = prompt.lowercase()
         val actionSignals = listOf("abre ", "abrir ", "cierra ", "cerrar ", "pon ", "poner ", "activa ", "activar ", "desactiva ", "enciende ", "apaga ", "llama ", "llamar ", "manda ", "enviar ", "envía ", "navega ", "buscar ", "busca ", "reproduce ", "reproducir ", "crea una alarma", "pon una alarma", "temporizador", "toma una captura", "lee la pantalla", "guarda en memoria", "recuerda ", "ejecuta ")
-        val multiStepSignals = listOf(" y luego ", " después ", " luego ", "y también", "primero ")
+        val multiStepSignals = listOf(" y luego ", " después ", " luego ", "y también", "primero ", "ahora hazlo", "ahora haz lo mismo", "haz lo mismo", "lo mismo", "el segundo", "el anterior", "esa configuración", "eso", "esa acción", "aquello")
         return actionSignals.any(normalized::contains) || multiStepSignals.any(normalized::contains)
     }
 
