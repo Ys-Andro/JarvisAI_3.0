@@ -99,7 +99,7 @@ class AppContainer(private val context: Context) {
     }
 
     val agentOrchestrator: AgentOrchestrator by lazy {
-        AgentOrchestrator(context, memoryRepository, documentRepository, inferenceRepository, settingsRepository)
+        AgentOrchestrator(context, conversationRepository, memoryRepository, documentRepository, inferenceRepository, settingsRepository)
     }
 
     val liveVoiceEngine: com.example.jarvisai.domain.voice.ILiveVoiceEngine by lazy {
