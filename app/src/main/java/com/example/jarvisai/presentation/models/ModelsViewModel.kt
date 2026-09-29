@@ -1,6 +1,8 @@
 package com.example.jarvisai.presentation.models
 
 import android.content.Context
+import android.net.Uri
+import java.io.File
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -35,6 +37,15 @@ class ModelsViewModel(
         observeGeminiModel()
         observeProviderApiKeys()
         observeSelectedAgent()
+        observeOfflineModel()
+    }
+
+    private fun observeOfflineModel() {
+        viewModelScope.launch {
+            settingsRepository.getOfflineModelPath().collect { path ->
+                _uiState.update { it.copy(offlineModelPath = path) }
+            }
+        }
     }
 
     private fun observeSelectedAgent() {
@@ -208,6 +219,53 @@ class ModelsViewModel(
                     customOpenAiEndpoint = endpoint.ifBlank { null },
                     statusMessage = "Dirección de servidor guardada."
                 )
+            }
+        }
+    }
+
+    fun importOfflineModel(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val modelsDir = File(context.filesDir, "models").apply { mkdirs() }
+                val displayName = context.contentResolver.query(
+                    uri,
+                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                }?.takeIf { it.endsWith(".gguf", ignoreCase = true) }
+                    ?: "jarvis-model.gguf"
+
+                val target = File(modelsDir, displayName)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                } ?: throw IllegalStateException("No se pudo leer el archivo seleccionado.")
+
+                settingsRepository.updateOfflineModelPath(target.absolutePath)
+                _uiState.update {
+                    it.copy(
+                        offlineModelPath = target.absolutePath,
+                        statusMessage = "Modelo GGUF importado: " + target.name
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error importing offline GGUF model", e)
+                _uiState.update { it.copy(errorMessage = "No se pudo importar el modelo GGUF: " + (e.message ?: "error desconocido")) }
+            }
+        }
+    }
+
+    fun removeOfflineModel() {
+        viewModelScope.launch {
+            val path = _uiState.value.offlineModelPath
+            if (!path.isNullOrBlank()) {
+                runCatching { File(path).delete() }
+            }
+            settingsRepository.updateOfflineModelPath("")
+            _uiState.update {
+                it.copy(offlineModelPath = null, statusMessage = "Modelo GGUF local eliminado.")
             }
         }
     }
