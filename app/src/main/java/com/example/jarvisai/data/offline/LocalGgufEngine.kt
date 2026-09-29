@@ -1,51 +1,48 @@
 package com.example.jarvisai.data.offline
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.example.jarvisai.domain.model.Message
 import com.example.jarvisai.domain.repository.ISettingsRepository
+import dev.ffmpegkit.llama.Llama
+import dev.ffmpegkit.llama.LlamaConfig
+import dev.ffmpegkit.llama.LlamaModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import net.amazingapps.llama.android.core.AiChat
-import net.amazingapps.llama.android.core.InferenceEngine
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.RandomAccessFile
-import android.os.Build
 
-/**
- * Embedded GGUF inference engine.
- *
- * llama.cpp is packaged as native code through llama.android. No Termux,
- * localhost server, cloud API, or network connection is required.
- */
 class LocalGgufEngine(
     context: Context,
     private val settingsRepository: ISettingsRepository
 ) {
     companion object {
         private const val TAG = "LocalGgufEngine"
+        private const val CONTEXT_SIZE = 2048
+        private const val CPU_THREADS = 4
         private const val MAX_HISTORY_MESSAGES = 6
-        private const val MAX_SYSTEM_PROMPT_CHARS = 12000
-        private const val MAX_PROMPT_CHARS = 6000
+        private const val MAX_SYSTEM_PROMPT_CHARS = 8000
+        private const val MAX_PROMPT_CHARS = 5000
         private const val DEFAULT_PREDICT_TOKENS = 128
         private const val MIN_PREDICT_TOKENS = 32
-        private const val MAX_PREDICT_TOKENS = 512
+        private const val MAX_PREDICT_TOKENS = 256
         private const val MIN_MODEL_BYTES = 64L * 1024L
     }
 
     private val mutex = Mutex()
-    private val engine: InferenceEngine by lazy {
-        AiChat.getInferenceEngine(context.applicationContext)
-    }
 
     @Volatile
     private var loadedPath: String? = null
+
+    @Volatile
+    private var loadedModel: LlamaModel? = null
 
     fun generate(
         prompt: String,
@@ -62,87 +59,142 @@ class LocalGgufEngine(
 
             val modelFile = File(modelPath)
             validateModelFile(modelFile)
-            Log.i(TAG, "Offline GGUF start: file=" + modelFile.name + ", size=" + modelFile.length() + " bytes, abi=" + Build.SUPPORTED_ABIS.joinToString())
+            validateAbi()
 
-            if (loadedPath != modelPath) {
-                withContext(Dispatchers.IO) {
-                    if (loadedPath != null) {
-                        runCatching { engine.cleanUp() }
-                            .onFailure { Log.w(TAG, "Previous GGUF cleanup failed", it) }
-                        loadedPath = null
-                    }
-                    Log.i(TAG, "Loading GGUF model off the UI thread: " + modelPath)
+            Log.i(TAG, "Offline GGUF start: file=" + modelFile.name +
+                ", size=" + modelFile.length() + " bytes, abi=" +
+                Build.SUPPORTED_ABIS.joinToString() + ", context=" +
+                CONTEXT_SIZE + ", threads=" + CPU_THREADS)
+
+            if (loadedPath != modelPath || loadedModel?.isLoaded != true) {
+                releaseLoadedModel()
+
+                val model = withContext(Dispatchers.Default) {
+                    Log.i(TAG, "Loading GGUF with llama.cpp: " + modelFile.absolutePath)
                     try {
-                        engine.loadModel(modelPath)
+                        Llama.loadModel(
+                            modelPath = modelPath,
+                            config = LlamaConfig(
+                                contextSize = CONTEXT_SIZE,
+                                threads = CPU_THREADS,
+                                gpuLayers = 0
+                            )
+                        )
                     } catch (t: Throwable) {
-                        Log.e(TAG, "GGUF loadModel failed: " + modelPath, t)
+                        Log.e(TAG, "GGUF native load failed: " + modelFile.absolutePath, t)
                         val detail = t.message ?: t.javaClass.simpleName
                         throw IllegalStateException(
                             "No se pudo cargar el modelo GGUF. Archivo=" + modelFile.name +
                                 ", tamaño=" + modelFile.length() + " bytes, ABI=" +
-                                Build.SUPPORTED_ABIS.joinToString() + ", error=" + detail, t
+                                Build.SUPPORTED_ABIS.joinToString() + ", contexto=" +
+                                CONTEXT_SIZE + ", hilos=" + CPU_THREADS + ", error=" + detail, t
                         )
                     }
-                    loadedPath = modelPath
-                    Log.i(TAG, "GGUF model loaded successfully: " + modelFile.name)
                 }
+
+                loadedModel = model
+                loadedPath = modelPath
+                Log.i(TAG, "GGUF model loaded successfully: " + modelFile.name)
             }
 
-            withContext(Dispatchers.Default) {
-                try {
-                    engine.setSystemPrompt(systemPrompt.take(MAX_SYSTEM_PROMPT_CHARS))
-                    val conversationContext = buildString {
-                        history.takeLast(MAX_HISTORY_MESSAGES).takeIf { it.isNotEmpty() }?.let { recent ->
-                            append("[CONVERSACIÓN RECIENTE]\n")
-                            recent.forEach { message ->
-                                append(message.role.name)
-                                append(": ")
-                                append(message.content.take(1500))
-                                append("\n")
-                            }
-                            append("\n")
-                        }
-                        append("[SOLICITUD ACTUAL]\n")
-                        append(prompt.take(MAX_PROMPT_CHARS))
+            val model = loadedModel
+                ?: throw IllegalStateException("El motor Offline no tiene un modelo cargado.")
+
+            val conversationContext = buildString {
+                history.takeLast(MAX_HISTORY_MESSAGES).takeIf { it.isNotEmpty() }?.let { recent ->
+                    append("[CONVERSACIÓN RECIENTE]\n")
+                    recent.forEach { message ->
+                        append(message.role.name)
+                        append(": ")
+                        append(message.content.take(1200))
+                        append("\n")
                     }
-                    val safePredictLength = predictLength.takeIf { it > 0 }
-                        ?.coerceIn(MIN_PREDICT_TOKENS, MAX_PREDICT_TOKENS)
-                        ?: DEFAULT_PREDICT_TOKENS
-                    Log.i(TAG, "Starting offline generation: promptChars=" + conversationContext.length + ", predictLength=" + safePredictLength)
-                    engine.sendUserPrompt(
-                        message = conversationContext,
-                        predictLength = safePredictLength
-                    ).collect { token -> emit(token) }
-                    Log.i(TAG, "Offline generation completed")
+                    append("\n")
+                }
+                append("[SOLICITUD ACTUAL]\n")
+                append(prompt.take(MAX_PROMPT_CHARS))
+            }
+
+            val safePredictLength = predictLength.takeIf { it > 0 }
+                ?.coerceIn(MIN_PREDICT_TOKENS, MAX_PREDICT_TOKENS)
+                ?: DEFAULT_PREDICT_TOKENS
+
+            val result = withContext(Dispatchers.Default) {
+                try {
+                    Log.i(TAG, "Starting offline completion: promptChars=" +
+                        conversationContext.length + ", predictLength=" + safePredictLength)
+                    Llama.complete(
+                        model = model,
+                        prompt = conversationContext,
+                        systemPrompt = systemPrompt.take(MAX_SYSTEM_PROMPT_CHARS),
+                        maxTokens = safePredictLength
+                    )
                 } catch (t: Throwable) {
                     Log.e(TAG, "GGUF inference failed", t)
                     val detail = t.message ?: t.javaClass.simpleName
-                    throw IllegalStateException("La inferencia Offline no pudo completarse: " + detail, t)
+                    throw IllegalStateException(
+                        "La inferencia Offline no pudo completarse: " + detail, t
+                    )
                 }
+            }
+
+            Log.i(TAG, "Offline generation completed: tokens=" +
+                result.tokensGenerated + ", tokensPerSecond=" + result.tokensPerSecond)
+
+            if (result.text.isNotEmpty()) {
+                emit(result.text)
             }
         }
     }.flowOn(Dispatchers.Default)
 
     private fun validateModelFile(modelFile: File) {
         if (!modelFile.isFile || !modelFile.canRead()) {
-            throw IllegalStateException("El modelo GGUF configurado no está disponible: " + modelFile.absolutePath)
+            throw IllegalStateException(
+                "El modelo GGUF configurado no está disponible: " + modelFile.absolutePath
+            )
         }
+
         val size = modelFile.length()
         if (size < MIN_MODEL_BYTES) {
-            throw IllegalStateException("El archivo GGUF parece incompleto o corrupto: " + modelFile.name + " (" + size + " bytes).")
+            throw IllegalStateException(
+                "El archivo GGUF parece incompleto o corrupto: " + modelFile.name +
+                    " (" + size + " bytes)."
+            )
         }
+
         val magic = ByteArray(4)
         RandomAccessFile(modelFile, "r").use { file -> file.readFully(magic) }
+
         if (magic.toString(Charsets.US_ASCII) != "GGUF") {
-            throw IllegalStateException("El archivo seleccionado no es un GGUF válido: " + modelFile.name + ".")
+            throw IllegalStateException(
+                "El archivo seleccionado no es un GGUF válido: " + modelFile.name + "."
+            )
         }
     }
+
+    private fun validateAbi() {
+        if (!Build.SUPPORTED_ABIS.any { it == "arm64-v8a" }) {
+            throw IllegalStateException(
+                "El motor Offline actual requiere ARM64 (arm64-v8a). ABIs detectadas: " +
+                    Build.SUPPORTED_ABIS.joinToString()
+            )
+        }
+    }
+
+    private fun releaseLoadedModel() {
+        loadedModel?.let { model ->
+            runCatching { Llama.releaseModel(model) }
+                .onFailure { Log.w(TAG, "Unable to release previous GGUF model", it) }
+        }
+        loadedModel = null
+        loadedPath = null
+    }
+
     fun release() {
         runCatching {
-            engine.cleanUp()
-            loadedPath = null
+            releaseLoadedModel()
         }.onFailure {
-            Log.w(TAG, "Unable to clean up local GGUF engine", it)
+            Log.w(TAG, "Unable to release local GGUF engine", it)
         }
     }
 }
