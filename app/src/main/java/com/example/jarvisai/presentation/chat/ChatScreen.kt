@@ -472,6 +472,7 @@ private fun ChatTopBar(
         com.example.jarvisai.domain.model.ModelProvider.GROQ -> Color(0xFFF55036)
         com.example.jarvisai.domain.model.ModelProvider.ANTHROPIC -> Color(0xFFD97706)
         com.example.jarvisai.domain.model.ModelProvider.CUSTOM_OPENAI -> Color(0xFF00B0FF)
+        com.example.jarvisai.domain.model.ModelProvider.LOCAL_GGUF -> JarvisAccentGreen
     }
 
     val arrowRotation by animateFloatAsState(
