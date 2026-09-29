@@ -16,6 +16,8 @@ interface ISettingsRepository {
     suspend fun updateCustomOpenAiEndpoint(endpoint: String)
     fun getSelectedGeminiModel(): Flow<String>
     suspend fun updateSelectedGeminiModel(model: String)
+    fun getOfflineModelPath(): Flow<String?>
+    suspend fun updateOfflineModelPath(path: String)
     fun getAppTheme(): Flow<AppThemeMode>
     suspend fun setAppTheme(theme: AppThemeMode)
     fun getSelectedAgentId(): Flow<String>
