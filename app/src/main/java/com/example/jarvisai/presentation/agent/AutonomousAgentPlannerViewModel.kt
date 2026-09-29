@@ -35,7 +35,13 @@ class AutonomousAgentPlannerViewModel(
     private val _uiState = MutableStateFlow(AgentPlannerUiState())
     val uiState: StateFlow<AgentPlannerUiState> = _uiState.asStateFlow()
 
-    private val orchestrator = AgentOrchestrator(context, memoryRepository, documentRepository)
+    private val orchestrator = AgentOrchestrator(
+        context = context,
+        memoryRepository = memoryRepository,
+        documentRepository = documentRepository,
+        inferenceRepository = inferenceRepository,
+        settingsRepository = settingsRepository
+    )
 
     fun onGoalInputChange(goal: String) {
         _uiState.update { it.copy(goalInput = goal) }
@@ -46,23 +52,25 @@ class AutonomousAgentPlannerViewModel(
         if (goal.isEmpty() || _uiState.value.isExecuting) return
 
         viewModelScope.launch {
+            val initialTasks = listOf(
+                AgentTask(title = "1. Análisis Cognitivo y Descomposición", description = "Evaluando restricciones y objetivos.", toolName = "LLM_SYNTHESIS", toolInput = goal),
+                AgentTask(title = "2. Búsqueda y Recuperación RAG", description = "Recuperando fragmentos de conocimiento relevantes.", toolName = "RAG_SEARCH", toolInput = goal),
+                AgentTask(title = "3. Verificación y Auto-corrección", description = "Auditando contexto y resultados disponibles.", toolName = "MEMORY", toolInput = goal),
+                AgentTask(title = "4. Síntesis Final del Plan", description = "Preparando el resultado final.", toolName = "LLM_SYNTHESIS", toolInput = goal)
+            )
+
             _uiState.update {
                 it.copy(
                     isExecuting = true,
                     errorMessage = null,
                     finalSynthesis = null,
-                    tasks = listOf(
-                        AgentTask(title = "1. Análisis Cognitivo y Descomposición", description = "Evaluando restricciones y objetivos.", toolName = "LLM_SYNTHESIS", toolInput = goal),
-                        AgentTask(title = "2. Búsqueda y Recuperación RAG", description = "Recuperando fragmentos de conocimiento relevantes.", toolName = "RAG_SEARCH", toolInput = goal),
-                        AgentTask(title = "3. Verificación y Auto-corrección", description = "Auditando consistencia y resultados de herramientas.", toolName = "MEMORY", toolInput = goal),
-                        AgentTask(title = "4. Síntesis Final del Plan", description = "Generando respuesta estructurada para el usuario.", toolName = "LLM_SYNTHESIS", toolInput = goal)
-                    )
+                    tasks = initialTasks
                 )
             }
 
             try {
-                val synthesis = orchestrator.runPlan(_uiState.value.tasks) { updatedTasks ->
-                    _uiState.update { it.copy(tasks = updatedTasks) }
+                val synthesis = orchestrator.runPlan(initialTasks, goal) { updatedTasks ->
+                    _uiState.update { state -> state.copy(tasks = updatedTasks) }
                 }
 
                 _uiState.update { state ->
@@ -76,7 +84,7 @@ class AutonomousAgentPlannerViewModel(
                     it.copy(
                         isExecuting = false,
                         errorMessage = "Error en ejecución agéntica: ${e.message}",
-                        tasks = it.tasks.map { t -> t.copy(status = TaskStatus.FAILED) }
+                        tasks = it.tasks.map { t -> t.copy(status = TaskStatus.FAILED, lastObservation = e.message) }
                     )
                 }
             }
