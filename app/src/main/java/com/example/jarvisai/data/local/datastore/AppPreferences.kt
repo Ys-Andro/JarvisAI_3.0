@@ -33,6 +33,7 @@ class AppPreferences(private val context: Context) {
         val CUSTOM_API_KEY = stringPreferencesKey("custom_api_key")
         val CUSTOM_OPENAI_ENDPOINT = stringPreferencesKey("custom_openai_endpoint")
         val SELECTED_GEMINI_MODEL = stringPreferencesKey("selected_gemini_model")
+        val OFFLINE_MODEL_PATH = stringPreferencesKey("offline_model_path")
         val TEMPERATURE = floatPreferencesKey("temperature")
         val TOP_P = floatPreferencesKey("top_p")
         val TOP_K = intPreferencesKey("top_k")
@@ -88,6 +89,8 @@ class AppPreferences(private val context: Context) {
             preferences[Keys.CUSTOM_API_KEY]?.let { put("custom", it) }
         }
     }
+
+    val offlineModelPath: Flow<String?> = safePreferences.map { preferences -> preferences[Keys.OFFLINE_MODEL_PATH] }
 
     val selectedGeminiModel: Flow<String> = safePreferences.map { preferences ->
         preferences[Keys.SELECTED_GEMINI_MODEL] ?: "gemini-3.6-flash"
@@ -204,6 +207,12 @@ class AppPreferences(private val context: Context) {
             } else {
                 preferences[Keys.CUSTOM_OPENAI_ENDPOINT] = endpoint.trim()
             }
+        }
+    }
+
+    suspend fun updateOfflineModelPath(path: String) {
+        dataStore.edit { preferences ->
+            if (path.isBlank()) preferences.remove(Keys.OFFLINE_MODEL_PATH) else preferences[Keys.OFFLINE_MODEL_PATH] = path.trim()
         }
     }
 
