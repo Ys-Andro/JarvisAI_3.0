@@ -29,9 +29,18 @@ class AgentOrchestrator(
         tasks: List<AgentTask>,
         goal: String = tasks.firstOrNull()?.toolInput.orEmpty(),
         conversationId: String? = null,
+        imageBase64: String? = null,
+        imageMimeType: String? = null,
         onTaskUpdate: (List<AgentTask>) -> Unit
     ): String {
-        return when (val result = agentCore.run(tasks, goal, conversationId, onTaskUpdate)) {
+        return when (val result = agentCore.run(
+            initialTasks = tasks,
+            goal = goal,
+            conversationId = conversationId,
+            imageBase64 = imageBase64,
+            imageMimeType = imageMimeType,
+            onTaskUpdate = onTaskUpdate
+        )) {
             is AgentRunResult.Completed -> result.message
             is AgentRunResult.Failed -> "Plan interrumpido: ${result.message}"
         }
@@ -48,7 +57,14 @@ class AgentOrchestrator(
         val initialTasks = createInitialPlan(goal, conversationId, conversationHistory, imageBase64, imageMimeType)
             ?: return "No pude construir un plan ejecutable para esa solicitud."
         if (initialTasks.isEmpty()) return "No encontré una acción o herramienta necesaria para completar esa solicitud."
-        return runPlan(initialTasks, goal, conversationId, onTaskUpdate)
+        return runPlan(
+            tasks = initialTasks,
+            goal = goal,
+            conversationId = conversationId,
+            imageBase64 = imageBase64,
+            imageMimeType = imageMimeType,
+            onTaskUpdate = onTaskUpdate
+        )
     }
 
     private suspend fun createInitialPlan(
