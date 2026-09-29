@@ -110,6 +110,9 @@ dependencies {
   implementation(libs.androidx.room.ktx)
   "ksp"(libs.androidx.room.compiler)
 
+  // Embedded offline inference (llama.cpp / GGUF)
+  implementation("com.github.1opp0-org:llama.android:v0.0.3")
+
   // Coroutines
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
