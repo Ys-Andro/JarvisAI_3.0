@@ -21,6 +21,7 @@ class ToolRegistry(
         AgentToolDescriptor("SEARCH_DOCUMENTS", "Busca contexto en documentos locales.", "texto de consulta"),
         AgentToolDescriptor("ACTION", "Ejecuta una acción Android validada.", "JSON de acción"),
         AgentToolDescriptor("DEVICE_CONTROL", "Ejecuta control de dispositivo mediante acciones permitidas.", "JSON de acción"),
+        AgentToolDescriptor("CURRENT_DATETIME", "Obtiene la fecha, hora y zona horaria reales del dispositivo.", "sin parámetros"),
         AgentToolDescriptor("MEMORY", "Consulta el estado de la memoria persistente local.", "consulta opcional"),
         AgentToolDescriptor("LLM_SYNTHESIS", "Representa una etapa de síntesis dentro del plan.", "texto"),
     )
@@ -46,6 +47,15 @@ class ToolRegistry(
                     val memories = memoryRepository.getAllMemories().first()
                     val context = contextProvider.buildAugmentedContext(input, docs, memories)
                     ToolExecutionResult(success = true, output = context.ifBlank { "No se encontró contexto relevante." })
+                }
+                "CURRENT_DATETIME" -> {
+                    val result = actionExecutor.executeActionJson("""{"action":"GET_CURRENT_DATETIME"}""")
+                    when (result) {
+                        is ActionExecutionResult.Success -> ToolExecutionResult(true, result.message)
+                        is ActionExecutionResult.Error -> ToolExecutionResult(false, error = result.reason)
+                        is ActionExecutionResult.Denied -> ToolExecutionResult(false, error = "Acción denegada: ${result.reason}")
+                        is ActionExecutionResult.RequiresConfirmation -> ToolExecutionResult(false, error = result.prompt, requiresConfirmation = true)
+                    }
                 }
                 "ACTION", "DEVICE_CONTROL" -> {
                     when (val result = actionExecutor.executeActionJson(input)) {
