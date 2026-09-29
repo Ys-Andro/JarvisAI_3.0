@@ -2,7 +2,7 @@ package com.example.jarvisai.data.action
 
 object ActionRegistry {
     val SUPPORTED_ACTIONS = setOf(
-        "FLASHLIGHT", "VOLUME", "MUTE", "BATTERY", "BATTERY_STATUS",
+        "FLASHLIGHT", "VOLUME", "MUTE", "BATTERY", "BATTERY_STATUS", "GET_CURRENT_DATETIME",
         "SET_ALARM", "SET_TIMER", "OPEN_APP", "WHATSAPP_MESSAGE",
         "YOUTUBE_SEARCH", "YOUTUBE", "MAPS_NAVIGATE", "NAVIGATE",
         "MAPS_SEARCH", "SPOTIFY", "SPOTIFY_PLAY", "CALL",
