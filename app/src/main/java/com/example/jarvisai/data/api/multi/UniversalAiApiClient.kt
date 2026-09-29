@@ -81,22 +81,18 @@ class UniversalAiApiClient(
             }
             else -> {
                 // OpenAI, DeepSeek, Groq, Custom OpenAI-compatible
-                val baseUrl = when {
-                    model.provider == ModelProvider.LOCAL_LLAMA -> normalizeOpenAiBaseUrl(customBaseUrl)
-                    model.id == "local-llama-termux" -> "http://127.0.0.1:8080/v1"
-                    !customBaseUrl.isNullOrBlank() -> customBaseUrl.trimEnd('/')
-                    else -> model.provider.defaultEndpoint
+                val baseUrl = if (model.id == "local-llama-termux") {
+                    "http://127.0.0.1:8080/v1"
+                } else if (!customBaseUrl.isNullOrBlank()) {
+                    customBaseUrl.trimEnd('/')
+                } else {
+                    model.provider.defaultEndpoint
                 }
                 streamOpenAiCompatible(apiKey, baseUrl, model.id, prompt, history, settings, imageBase64, imageMimeType)
             }
         }
     }
 
-    private fun normalizeOpenAiBaseUrl(raw: String?): String {
-        val endpoint = raw?.trim()?.trimEnd('/').orEmpty()
-        if (endpoint.isBlank()) return "http://127.0.0.1:8080/v1"
-        return if (endpoint.endsWith("/v1")) endpoint else "$endpoint/v1"
-    }
 
     private fun streamOpenAiCompatible(
         apiKey: String,
