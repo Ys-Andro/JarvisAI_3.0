@@ -94,7 +94,10 @@ class AgentOrchestrator(
             ${toolRegistry.describeTools()}
 
             Para ACTION, toolInput debe ser JSON válido con el campo action.
+            Para consultas sobre hora o fecha actual, usa CURRENT_DATETIME y no respondas con conocimiento del modelo.
+            CURRENT_DATETIME consulta directamente el reloj del dispositivo y no requiere parámetros.
             Acciones Android disponibles: ${actionCatalog}
+            Ejemplo: CURRENT_DATETIME -> obtener la hora y fecha reales del dispositivo.
             Ejemplos: ACTION -> {"action":"OPEN_APP","appName":"WhatsApp"}
             ACTION -> {"action":"VOLUME","level":40}
             ACTION -> {"action":"SET_TIMER","seconds":300,"message":"Temporizador"}
