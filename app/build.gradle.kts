@@ -13,8 +13,12 @@ android {
     applicationId = "com.aistudio.jarvisai.anzqdm"
     minSdk = 26
     targetSdk = 35
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = providers.environmentVariable("JARVIS_VERSION_CODE")
+      .map { it.toInt() }
+      .getOrElse { 1 }
+    versionName = providers.environmentVariable("JARVIS_VERSION_NAME")
+      .orElse("1.0")
+      .get()
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
