@@ -9,11 +9,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.amazingapps.llama.android.core.AiChat
 import net.amazingapps.llama.android.core.InferenceEngine
 import java.io.File
+import java.io.RandomAccessFile
+import android.os.Build
 
 /**
  * Embedded GGUF inference engine.
@@ -27,6 +30,13 @@ class LocalGgufEngine(
 ) {
     companion object {
         private const val TAG = "LocalGgufEngine"
+        private const val MAX_HISTORY_MESSAGES = 6
+        private const val MAX_SYSTEM_PROMPT_CHARS = 12000
+        private const val MAX_PROMPT_CHARS = 6000
+        private const val DEFAULT_PREDICT_TOKENS = 128
+        private const val MIN_PREDICT_TOKENS = 32
+        private const val MAX_PREDICT_TOKENS = 512
+        private const val MIN_MODEL_BYTES = 64L * 1024L
     }
 
     private val mutex = Mutex()
@@ -57,40 +67,83 @@ class LocalGgufEngine(
                 )
             }
 
+            val modelFile = File(modelPath)
+            validateModelFile(modelFile)
+            Log.i(TAG, "Offline GGUF start: file=" + modelFile.name + ", size=" + modelFile.length() + " bytes, abi=" + Build.SUPPORTED_ABIS.joinToString())
+
             if (loadedPath != modelPath) {
-                if (loadedPath != null) {
-                    runCatching { engine.cleanUp() }
-                }
-                engine.loadModel(modelPath)
-                loadedPath = modelPath
-            }
-
-            engine.setSystemPrompt(systemPrompt)
-
-            val conversationContext = buildString {
-                history.takeLast(12).takeIf { it.isNotEmpty() }?.let { recent ->
-                    append("[CONVERSACIÓN RECIENTE]\n")
-                    recent.forEach { message ->
-                        append(message.role.name)
-                        append(": ")
-                        append(message.content)
-                        append("\n")
+                withContext(Dispatchers.IO) {
+                    if (loadedPath != null) {
+                        runCatching { engine.cleanUp() }
+                            .onFailure { Log.w(TAG, "Previous GGUF cleanup failed", it) }
+                        loadedPath = null
                     }
-                    append("\n")
+                    Log.i(TAG, "Loading GGUF model off the UI thread: " + modelPath)
+                    try {
+                        engine.loadModel(modelPath)
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "GGUF loadModel failed: " + modelPath, t)
+                        val detail = t.message ?: t.javaClass.simpleName
+                        throw IllegalStateException(
+                            "No se pudo cargar el modelo GGUF. Archivo=" + modelFile.name +
+                                ", tamaño=" + modelFile.length() + " bytes, ABI=" +
+                                Build.SUPPORTED_ABIS.joinToString() + ", error=" + detail, t
+                        )
+                    }
+                    loadedPath = modelPath
+                    Log.i(TAG, "GGUF model loaded successfully: " + modelFile.name)
                 }
-                append("[SOLICITUD ACTUAL]\n")
-                append(prompt)
             }
 
-            engine.sendUserPrompt(
-                message = conversationContext,
-                predictLength = predictLength.coerceIn(64, 2048)
-            ).collect { token ->
-                emit(token)
+            withContext(Dispatchers.Default) {
+                try {
+                    engine.setSystemPrompt(systemPrompt.take(MAX_SYSTEM_PROMPT_CHARS))
+                    val conversationContext = buildString {
+                        history.takeLast(MAX_HISTORY_MESSAGES).takeIf { it.isNotEmpty() }?.let { recent ->
+                            append("[CONVERSACIÓN RECIENTE]\n")
+                            recent.forEach { message ->
+                                append(message.role.name)
+                                append(": ")
+                                append(message.content.take(1500))
+                                append("\n")
+                            }
+                            append("\n")
+                        }
+                        append("[SOLICITUD ACTUAL]\n")
+                        append(prompt.take(MAX_PROMPT_CHARS))
+                    }
+                    val safePredictLength = predictLength.takeIf { it > 0 }
+                        ?.coerceIn(MIN_PREDICT_TOKENS, MAX_PREDICT_TOKENS)
+                        ?: DEFAULT_PREDICT_TOKENS
+                    Log.i(TAG, "Starting offline generation: promptChars=" + conversationContext.length + ", predictLength=" + safePredictLength)
+                    engine.sendUserPrompt(
+                        message = conversationContext,
+                        predictLength = safePredictLength
+                    ).collect { token -> emit(token) }
+                    Log.i(TAG, "Offline generation completed")
+                } catch (t: Throwable) {
+                    Log.e(TAG, "GGUF inference failed", t)
+                    val detail = t.message ?: t.javaClass.simpleName
+                    throw IllegalStateException("La inferencia Offline no pudo completarse: " + detail, t)
+                }
             }
         }
     }.flowOn(Dispatchers.Default)
 
+    private fun validateModelFile(modelFile: File) {
+        if (!modelFile.isFile || !modelFile.canRead()) {
+            throw IllegalStateException("El modelo GGUF configurado no está disponible: " + modelFile.absolutePath)
+        }
+        val size = modelFile.length()
+        if (size < MIN_MODEL_BYTES) {
+            throw IllegalStateException("El archivo GGUF parece incompleto o corrupto: " + modelFile.name + " (" + size + " bytes).")
+        }
+        val magic = ByteArray(4)
+        RandomAccessFile(modelFile, "r").use { file -> file.readFully(magic) }
+        if (magic.toString(Charsets.US_ASCII) != "GGUF") {
+            throw IllegalStateException("El archivo seleccionado no es un GGUF válido: " + modelFile.name + ".")
+        }
+    }
     fun release() {
         runCatching {
             engine.cleanUp()
