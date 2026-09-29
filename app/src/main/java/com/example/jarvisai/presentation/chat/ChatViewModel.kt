@@ -478,7 +478,7 @@ class ChatViewModel(
         generationJob = viewModelScope.launch {
             try {
                 val startTime = System.currentTimeMillis()
-                val result = agentOrchestrator.runGoal(goal, history)
+                val result = agentOrchestrator.runGoal(goal, conversationId = currentConversationId, conversationHistory = history)
                 conversationRepository.updateMessageContent(assistantMsgId, result, 0f, System.currentTimeMillis() - startTime)
                 _uiState.update { it.copy(streamingMessageId = null, tokensPerSecond = 0f) }
                 if (settings.autoTts && result.isNotBlank()) speakText(result)
