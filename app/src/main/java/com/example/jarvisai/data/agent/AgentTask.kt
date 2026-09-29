@@ -16,6 +16,8 @@ data class AgentTask(
     val status: TaskStatus = TaskStatus.PENDING,
     val outputResult: String? = null,
     val error: String? = null,
+    val lastObservation: String? = null,
     val retryCount: Int = 0,
-    val maxRetries: Int = 2
+    val maxRetries: Int = 2,
+    val replanCount: Int = 0
 )
