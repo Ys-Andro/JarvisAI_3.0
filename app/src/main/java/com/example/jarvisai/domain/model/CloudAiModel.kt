@@ -24,13 +24,6 @@ data class CloudAiModel(
 ) {
     companion object {
         val ALL_MODELS = listOf(
-            CloudAiModel(
-                id = "local-gguf",
-                provider = ModelProvider.LOCAL_GGUF,
-                name = "Modelo local GGUF",
-                description = "Motor local sin dependencia de internet",
-                defaultContextLength = 8192
-            ),
             // Google Gemini (Default Model: gemini-3.6-flash)
             CloudAiModel(
                 id = "gemini-3.6-flash",
@@ -38,6 +31,13 @@ data class CloudAiModel(
                 name = "Gemini 3.6 Flash",
                 description = "Recomendado: Rápido, preciso y equilibrado para el día a día",
                 defaultContextLength = 1048576
+            ),
+            CloudAiModel(
+                id = "local-gguf",
+                provider = ModelProvider.LOCAL_GGUF,
+                name = "Modelo local GGUF",
+                description = "Motor local sin dependencia de internet",
+                defaultContextLength = 8192
             ),
             CloudAiModel(
                 id = "gemini-2.0-flash",
