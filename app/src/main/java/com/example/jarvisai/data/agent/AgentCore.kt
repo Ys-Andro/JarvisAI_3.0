@@ -11,10 +11,11 @@ class AgentCore(
     private val toolRegistry: ToolRegistry,
     private val inferenceRepository: IInferenceRepository,
     private val settingsRepository: ISettingsRepository,
+    private val contextManager: AgentContextManager,
     private val maxExecutionSteps: Int = 12,
     private val maxReplans: Int = 3
 ) {
-    suspend fun run(initialTasks: List<AgentTask>, goal: String, onTaskUpdate: (List<AgentTask>) -> Unit): AgentRunResult {
+    suspend fun run(initialTasks: List<AgentTask>, goal: String, conversationId: String? = null, onTaskUpdate: (List<AgentTask>) -> Unit): AgentRunResult {
         val tasks = initialTasks.toMutableList()
         var index = 0
         var executionSteps = 0
@@ -66,7 +67,7 @@ class AgentCore(
             }
 
             val failedTask = tasks[index]
-            val replacement = replan(goal, failedTask, observations, replanCount + 1)
+            val replacement = replan(goal, conversationId, tasks, failedTask, observations, replanCount + 1)
             if (replacement.isNullOrEmpty()) {
                 markRemainingAsSkipped(tasks, index + 1)
                 onTaskUpdate(tasks.toList())
@@ -93,40 +94,52 @@ class AgentCore(
         }
     }
 
-    private suspend fun replan(goal: String, failedTask: AgentTask, observations: List<String>, replanNumber: Int): List<AgentTask>? {
+    private suspend fun replan(
+        goal: String,
+        conversationId: String?,
+        tasks: List<AgentTask>,
+        failedTask: AgentTask,
+        observations: List<String>,
+        replanNumber: Int
+    ): List<AgentTask>? {
         val settings = settingsRepository.getSettings().first()
+        val context = contextManager.build(
+            goal = goal,
+            conversationId = conversationId,
+            tasks = tasks,
+            observations = observations
+        )
         val prompt = """
             [AGENT REPLANNING]
-            Goal: $goal
+            Revisa el plan usando todo el contexto de trabajo. Las referencias del usuario
+            como "el segundo", "eso" o "lo mismo" deben resolverse con la conversación,
+            memoria, RAG, observaciones y estado de tareas.
+
+            ${context.toPromptBlock()}
+
             Failed task: ${failedTask.title}
             Tool: ${failedTask.toolName}
             Input: ${failedTask.toolInput}
             Error: ${failedTask.error.orEmpty()}
-            Recent observations:
-            ${observations.takeLast(8).joinToString("\n")}
+            Replan attempt: ${replanNumber} of ${maxReplans}.
 
             Available tools:
             ${toolRegistry.describeTools()}
 
-            Replan attempt: $replanNumber of $maxReplans.
-
             Return JSON only:
-            {
-              "decision": "REPLAN" | "STOP",
-              "tasks": [
-                {"title":"short title","description":"goal of step","toolName":"exact tool name","toolInput":"exact input"}
-              ]
-            }
-            Rules: use only listed tools; prefer the smallest viable alternative plan; do not invent tools; do not repeat the exact failed step unless strategy changes; use STOP if continuation is not reasonable.
+            {"decision":"REPLAN"|"STOP","tasks":[{"title":"short title","description":"goal of step","toolName":"exact tool name","toolInput":"exact input"}]}
+
+            Rules: use only listed tools; prefer the smallest viable alternative plan;
+            preserve useful completed work; do not repeat the exact failed step unless strategy changes;
+            use STOP if continuation is not reasonable.
         """.trimIndent()
 
         return try {
             val response = StringBuilder()
-            inferenceRepository.generateCompletionStream(prompt, emptyList<Message>(), settings).collect { response.append(it) }
+            inferenceRepository.generateCompletionStream(prompt, context.conversation, settings).collect { response.append(it) }
             parseReplan(response.toString(), replanNumber)
         } catch (_: Exception) { null }
     }
-
     private fun parseReplan(raw: String, replanCount: Int): List<AgentTask>? {
         val normalized = raw.replace("```json", "", ignoreCase = true).replace("```", "").trim()
         val start = normalized.indexOf('{')
