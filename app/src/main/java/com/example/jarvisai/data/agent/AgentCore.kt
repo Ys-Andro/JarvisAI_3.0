@@ -15,7 +15,14 @@ class AgentCore(
     private val maxExecutionSteps: Int = 12,
     private val maxReplans: Int = 3
 ) {
-    suspend fun run(initialTasks: List<AgentTask>, goal: String, conversationId: String? = null, onTaskUpdate: (List<AgentTask>) -> Unit): AgentRunResult {
+    suspend fun run(
+        initialTasks: List<AgentTask>,
+        goal: String,
+        conversationId: String? = null,
+        imageBase64: String? = null,
+        imageMimeType: String? = null,
+        onTaskUpdate: (List<AgentTask>) -> Unit
+    ): AgentRunResult {
         val tasks = initialTasks.toMutableList()
         var index = 0
         var executionSteps = 0
@@ -67,7 +74,16 @@ class AgentCore(
             }
 
             val failedTask = tasks[index]
-            val replacement = replan(goal, conversationId, tasks, failedTask, observations, replanCount + 1)
+            val replacement = replan(
+                goal = goal,
+                conversationId = conversationId,
+                tasks = tasks,
+                failedTask = failedTask,
+                observations = observations,
+                replanNumber = replanCount + 1,
+                imageBase64 = imageBase64,
+                imageMimeType = imageMimeType
+            )
             if (replacement.isNullOrEmpty()) {
                 markRemainingAsSkipped(tasks, index + 1)
                 onTaskUpdate(tasks.toList())
@@ -100,7 +116,9 @@ class AgentCore(
         tasks: List<AgentTask>,
         failedTask: AgentTask,
         observations: List<String>,
-        replanNumber: Int
+        replanNumber: Int,
+        imageBase64: String? = null,
+        imageMimeType: String? = null
     ): List<AgentTask>? {
         val settings = settingsRepository.getSettings().first()
         val context = contextManager.build(
@@ -111,7 +129,9 @@ class AgentCore(
         )
         val prompt = """
             [AGENT REPLANNING]
-            Revisa el plan usando todo el contexto de trabajo. Las referencias del usuario
+            Revisa el plan usando todo el contexto de trabajo. Si existe una imagen adjunta,
+            vuelve a inspeccionarla como evidencia visual para corregir el plan.
+            Las referencias del usuario
             como "el segundo", "eso" o "lo mismo" deben resolverse con la conversación,
             memoria, RAG, observaciones y estado de tareas.
 
@@ -136,7 +156,13 @@ class AgentCore(
 
         return try {
             val response = StringBuilder()
-            inferenceRepository.generateCompletionStream(prompt, context.conversation, settings).collect { response.append(it) }
+            inferenceRepository.generateCompletionStream(
+                prompt = prompt,
+                conversationHistory = context.conversation,
+                settings = settings,
+                imageBase64 = imageBase64,
+                imageMimeType = imageMimeType
+            ).collect { response.append(it) }
             parseReplan(response.toString(), replanNumber)
         } catch (_: Exception) { null }
     }
