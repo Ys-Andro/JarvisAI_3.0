@@ -55,6 +55,7 @@ class JarvisViewModelFactory(
             }
             modelClass.isAssignableFrom(AutonomousAgentPlannerViewModel::class.java) -> {
                 AutonomousAgentPlannerViewModel(
+                    conversationRepository = appContainer.conversationRepository,
                     inferenceRepository = appContainer.inferenceRepository,
                     settingsRepository = appContainer.settingsRepository,
                     context = context,
