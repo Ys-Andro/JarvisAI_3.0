@@ -213,7 +213,13 @@ class ChatViewModel(
                 it.copy(
                     selectedModelId = modelId,
                     isModelLoaded = isReady,
-                    errorMessage = if (!isReady) {\n                        if (modelDef.provider == ModelProvider.LOCAL_GGUF) "Falta configurar un modelo GGUF local en Ajustes." else "Falta configurar la clave de ${modelDef.provider.displayName}. Puedes ingresarla en Ajustes."\n                    } else null
+                    errorMessage = if (!isReady) {
+                        if (modelDef.provider == ModelProvider.LOCAL_GGUF) {
+                            "Falta configurar un modelo GGUF local en Ajustes."
+                        } else {
+                            "Falta configurar la clave de ${modelDef.provider.displayName}. Puedes ingresarla en Ajustes."
+                        }
+                    } else null
                 )
             }
         }
