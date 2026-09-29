@@ -14,6 +14,7 @@ import com.example.jarvisai.data.repository.ConversationRepositoryImpl
 import com.example.jarvisai.data.repository.DocumentRepositoryImpl
 import com.example.jarvisai.data.repository.GeminiInferenceRepository
 import com.example.jarvisai.data.repository.GoogleCloudTtsRepository
+import com.example.jarvisai.data.agent.AgentOrchestrator
 import com.example.jarvisai.data.repository.MemoryRepositoryImpl
 import com.example.jarvisai.data.repository.SettingsRepositoryImpl
 import com.example.jarvisai.data.util.NetworkMonitor
@@ -95,6 +96,10 @@ class AppContainer(private val context: Context) {
 
     val ttsRepository: ITtsRepository by lazy {
         googleCloudTtsRepository
+    }
+
+    val agentOrchestrator: AgentOrchestrator by lazy {
+        AgentOrchestrator(context, memoryRepository, documentRepository, inferenceRepository, settingsRepository)
     }
 
     val liveVoiceEngine: com.example.jarvisai.domain.voice.ILiveVoiceEngine by lazy {
