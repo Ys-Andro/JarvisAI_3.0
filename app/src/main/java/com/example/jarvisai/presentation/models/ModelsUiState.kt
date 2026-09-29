@@ -9,6 +9,7 @@ data class ModelsUiState(
     val customOpenAiEndpoint: String? = null,
     val selectedGeminiModel: String = "gemini-3.6-flash",
     val selectedAgentId: String = "jarvis_prime",
+    val offlineModelPath: String? = null,
     val isValidatingApiKey: Boolean = false,
     val settings: GenerationSettings = GenerationSettings(),
     val appTheme: AppThemeMode = AppThemeMode.DARK_JARVIS,
