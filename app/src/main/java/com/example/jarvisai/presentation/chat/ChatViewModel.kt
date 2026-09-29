@@ -3,6 +3,7 @@ package com.example.jarvisai.presentation.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
+import com.example.jarvisai.data.agent.AgentOrchestrator
 import com.example.jarvisai.domain.model.CloudAiModel
 import com.example.jarvisai.domain.model.GenerationSettings
 import com.example.jarvisai.domain.model.InferenceState
@@ -34,7 +35,8 @@ class ChatViewModel(
     private val ttsRepository: ITtsRepository,
     private val documentRepository: IDocumentRepository,
     private val memoryRepository: IMemoryRepository,
-    val liveVoiceEngine: ILiveVoiceEngine
+    val liveVoiceEngine: ILiveVoiceEngine,
+    private val agentOrchestrator: AgentOrchestrator
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -449,17 +451,44 @@ class ChatViewModel(
             val settings = settingsRepository.getSettings().first()
             val history = _uiState.value.messages
 
-            executeInferenceStream(
-                assistantMsgId = assistantMsgId,
-                prompt = effectivePrompt,
-                history = history,
-                settings = settings,
-                imageBase64 = attachedBase64,
-                imageMimeType = attachedMime
-            )
+            if (shouldUseAgent(effectivePrompt)) {
+                executeAgentGoal(assistantMsgId, effectivePrompt, history, settings)
+            } else {
+                executeInferenceStream(
+                    assistantMsgId = assistantMsgId,
+                    prompt = effectivePrompt,
+                    history = history,
+                    settings = settings,
+                    imageBase64 = attachedBase64,
+                    imageMimeType = attachedMime
+                )
+            }
         }
     }
 
+    private fun shouldUseAgent(prompt: String): Boolean {
+        val normalized = prompt.lowercase()
+        val actionSignals = listOf("abre ", "abrir ", "cierra ", "cerrar ", "pon ", "poner ", "activa ", "activar ", "desactiva ", "enciende ", "apaga ", "llama ", "llamar ", "manda ", "enviar ", "envía ", "navega ", "buscar ", "busca ", "reproduce ", "reproducir ", "crea una alarma", "pon una alarma", "temporizador", "toma una captura", "lee la pantalla", "guarda en memoria", "recuerda ", "ejecuta ")
+        val multiStepSignals = listOf(" y luego ", " después ", " luego ", "y también", "primero ")
+        return actionSignals.any(normalized::contains) || multiStepSignals.any(normalized::contains)
+    }
+
+    private fun executeAgentGoal(assistantMsgId: String, goal: String, history: List<Message>, settings: GenerationSettings) {
+        generationJob?.cancel()
+        generationJob = viewModelScope.launch {
+            try {
+                val startTime = System.currentTimeMillis()
+                val result = agentOrchestrator.runGoal(goal, history)
+                conversationRepository.updateMessageContent(assistantMsgId, result, 0f, System.currentTimeMillis() - startTime)
+                _uiState.update { it.copy(streamingMessageId = null, tokensPerSecond = 0f) }
+                if (settings.autoTts && result.isNotBlank()) speakText(result)
+            } catch (e: Exception) {
+                val message = "No pude completar la tarea agéntica: ${e.message ?: "error desconocido"}"
+                conversationRepository.updateMessageContent(assistantMsgId, message, 0f, 0L)
+                _uiState.update { it.copy(streamingMessageId = null, errorMessage = message, inferenceStatus = ChatInferenceStatus.Error(message)) }
+            }
+        }
+    }
     private fun executeInferenceStream(
         assistantMsgId: String,
         prompt: String,
