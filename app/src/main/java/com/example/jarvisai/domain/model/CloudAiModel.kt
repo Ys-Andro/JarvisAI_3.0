@@ -11,8 +11,7 @@ enum class ModelProvider(
     DEEPSEEK("deepseek", "DeepSeek", "https://api.deepseek.com/v1"),
     GROQ("groq", "Groq (Rápido)", "https://api.groq.com/openai/v1"),
     ANTHROPIC("anthropic", "Anthropic Claude", "https://api.anthropic.com/v1"),
-    CUSTOM_OPENAI("custom", "Servidor Personalizado (OpenAI compatible)", ""),
-    LOCAL_LLAMA("local_llama", "Llama local (PC)", "")
+    CUSTOM_OPENAI("custom", "Servidor Personalizado (OpenAI compatible)", "")
 }
 
 data class CloudAiModel(
@@ -25,10 +24,10 @@ data class CloudAiModel(
     companion object {
         val ALL_MODELS = listOf(
             CloudAiModel(
-                id = "local-llama-pc",
-                provider = ModelProvider.LOCAL_LLAMA,
-                name = "Llama Local (PC)",
-                description = "Modelo offline servido por llama-server en tu PC mediante API OpenAI-compatible.",
+                id = "local-llama-termux",
+                provider = ModelProvider.CUSTOM_OPENAI,
+                name = "Llama local (PC)",
+                description = "Modelo GGUF servido por llama-server en el PC y accesible desde Android mediante http://127.0.0.1:8080.",
                 defaultContextLength = 32768
             ),
             // Google Gemini (Default Model: gemini-3.6-flash)
