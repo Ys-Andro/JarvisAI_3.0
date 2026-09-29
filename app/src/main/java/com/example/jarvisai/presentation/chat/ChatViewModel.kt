@@ -159,10 +159,11 @@ class ChatViewModel(
             combine(
                 settingsRepository.getSelectedGeminiModel(),
                 settingsRepository.getAllProviderApiKeys(),
-                settingsRepository.getApiKey()
-            ) { selectedModelId, providerKeys, generalApiKey ->
+                settingsRepository.getApiKey(),
+                settingsRepository.getOfflineModelPath()
+            ) { selectedModelId, providerKeys, generalApiKey, offlineModelPath ->
                 val modelDef = CloudAiModel.findById(selectedModelId)
-                val isReady = isProviderConfigured(modelDef.provider, providerKeys, generalApiKey)
+                val isReady = isProviderConfigured(modelDef.provider, providerKeys, generalApiKey, offlineModelPath)
                 Triple(selectedModelId, providerKeys, isReady)
             }.collect { (modelId, providerKeys, isReady) ->
                 _uiState.update {
@@ -179,8 +180,12 @@ class ChatViewModel(
     private fun isProviderConfigured(
         provider: ModelProvider,
         providerKeys: Map<String, String>,
-        generalApiKey: String?
+        generalApiKey: String?,
+        offlineModelPath: String? = null
     ): Boolean {
+        if (provider == ModelProvider.LOCAL_GGUF) {
+            return !offlineModelPath.isNullOrBlank() && java.io.File(offlineModelPath).isFile
+        }
         if (provider == ModelProvider.GEMINI) {
             val provKey = providerKeys["gemini"]
             val buildKey = try {
@@ -202,12 +207,13 @@ class ChatViewModel(
             val modelDef = CloudAiModel.findById(modelId)
             val providerKeys = _uiState.value.providerApiKeys
             val genKey = settingsRepository.getApiKey().first()
-            val isReady = isProviderConfigured(modelDef.provider, providerKeys, genKey)
+            val offlineModelPath = settingsRepository.getOfflineModelPath().first()
+            val isReady = isProviderConfigured(modelDef.provider, providerKeys, genKey, offlineModelPath)
             _uiState.update {
                 it.copy(
                     selectedModelId = modelId,
                     isModelLoaded = isReady,
-                    errorMessage = if (!isReady) "Falta configurar la clave de ${modelDef.provider.displayName}. Puedes ingresarla en Ajustes." else null
+                    errorMessage = if (!isReady) {\n                        if (modelDef.provider == ModelProvider.LOCAL_GGUF) "Falta configurar un modelo GGUF local en Ajustes." else "Falta configurar la clave de ${modelDef.provider.displayName}. Puedes ingresarla en Ajustes."\n                    } else null
                 )
             }
         }
