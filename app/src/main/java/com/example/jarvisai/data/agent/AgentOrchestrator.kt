@@ -14,8 +14,8 @@ class AgentOrchestrator(
     context: Context,
     memoryRepository: IMemoryRepository,
     documentRepository: IDocumentRepository,
-    inferenceRepository: IInferenceRepository,
-    settingsRepository: ISettingsRepository
+    private val inferenceRepository: IInferenceRepository,
+    private val settingsRepository: ISettingsRepository
 ) {
     private val toolRegistry = ToolRegistry(context, memoryRepository, documentRepository)
     private val verifier = Verifier()
