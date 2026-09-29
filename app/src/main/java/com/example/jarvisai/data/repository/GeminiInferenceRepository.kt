@@ -100,7 +100,7 @@ class GeminiInferenceRepository(
     ): Flow<String> = flow {
         val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
         val modelDef = CloudAiModel.findById(selectedModelId)
-        val isLocalLlama = modelDef.provider == ModelProvider.LOCAL_LLAMA
+        val isLocalLlama = modelDef.id == "local-llama-termux"
 
         if (!isLocalLlama && !networkMonitor.isCurrentlyOnline) {
             val noConnectionMsg = "No hay conexión a internet. Revisa tu conexión Wi-Fi o datos móviles para conversar con el asistente."
@@ -186,10 +186,7 @@ class GeminiInferenceRepository(
 
         val effectiveSettings = settings.copy(systemPrompt = combinedSystemPrompt)
 
-        val customBaseUrl = if (
-            modelDef.provider == ModelProvider.CUSTOM_OPENAI ||
-            modelDef.provider == ModelProvider.LOCAL_LLAMA
-        ) {
+        val customBaseUrl = if (modelDef.provider == ModelProvider.CUSTOM_OPENAI && !isLocalLlama) {
             settingsRepository.getCustomOpenAiEndpoint().first()
         } else null
 
