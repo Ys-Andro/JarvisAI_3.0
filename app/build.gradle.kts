@@ -117,7 +117,7 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
 
   // Embedded offline inference (llama.cpp / GGUF)
-  implementation("com.github.1opp0-org:llama.android:v0.0.3")
+  implementation("dev.ffmpegkit-maintained:llama-android:0.1.1")
 
   // Coroutines
   implementation(libs.kotlinx.coroutines.android)
