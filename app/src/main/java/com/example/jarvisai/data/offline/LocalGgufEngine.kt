@@ -61,13 +61,6 @@ class LocalGgufEngine(
                 )
 
             val modelFile = File(modelPath)
-            if (!modelFile.isFile || !modelFile.canRead()) {
-                throw IllegalStateException(
-                    "El modelo GGUF configurado no está disponible: $modelPath"
-                )
-            }
-
-            val modelFile = File(modelPath)
             validateModelFile(modelFile)
             Log.i(TAG, "Offline GGUF start: file=" + modelFile.name + ", size=" + modelFile.length() + " bytes, abi=" + Build.SUPPORTED_ABIS.joinToString())
 
