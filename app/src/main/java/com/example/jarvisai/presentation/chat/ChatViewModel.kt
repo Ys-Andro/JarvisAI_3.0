@@ -452,7 +452,14 @@ class ChatViewModel(
             val history = _uiState.value.messages
 
             if (shouldUseAgent(effectivePrompt)) {
-                executeAgentGoal(assistantMsgId, effectivePrompt, history, settings)
+                executeAgentGoal(
+                    assistantMsgId = assistantMsgId,
+                    goal = effectivePrompt,
+                    history = history,
+                    settings = settings,
+                    imageBase64 = attachedBase64,
+                    imageMimeType = attachedMime
+                )
             } else {
                 executeInferenceStream(
                     assistantMsgId = assistantMsgId,
@@ -473,12 +480,25 @@ class ChatViewModel(
         return actionSignals.any(normalized::contains) || multiStepSignals.any(normalized::contains)
     }
 
-    private fun executeAgentGoal(assistantMsgId: String, goal: String, history: List<Message>, settings: GenerationSettings) {
+    private fun executeAgentGoal(
+        assistantMsgId: String,
+        goal: String,
+        history: List<Message>,
+        settings: GenerationSettings,
+        imageBase64: String? = null,
+        imageMimeType: String? = null
+    ) {
         generationJob?.cancel()
         generationJob = viewModelScope.launch {
             try {
                 val startTime = System.currentTimeMillis()
-                val result = agentOrchestrator.runGoal(goal, conversationId = currentConversationId, conversationHistory = history)
+                val result = agentOrchestrator.runGoal(
+                    goal = goal,
+                    conversationId = currentConversationId,
+                    conversationHistory = history,
+                    imageBase64 = imageBase64,
+                    imageMimeType = imageMimeType
+                )
                 conversationRepository.updateMessageContent(assistantMsgId, result, 0f, System.currentTimeMillis() - startTime)
                 _uiState.update { it.copy(streamingMessageId = null, tokensPerSecond = 0f) }
                 if (settings.autoTts && result.isNotBlank()) speakText(result)
