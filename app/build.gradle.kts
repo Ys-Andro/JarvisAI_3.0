@@ -50,6 +50,12 @@ android {
     }
   }
 
+  packaging {
+    jniLibs {
+      useLegacyPackaging = true
+    }
+  }
+
   buildTypes {
     release {
       isCrunchPngs = false
