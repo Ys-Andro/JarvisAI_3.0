@@ -14,6 +14,8 @@ import android.provider.Settings
 import android.util.Log
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 object DeviceController {
     private const val TAG = "DeviceController"
@@ -55,6 +57,15 @@ object DeviceController {
                     val batt = getBatteryInfo(context)
                     val chargingStr = if (batt.isCharging) "Conectado al cargador ⚡" else "Batería en descarga"
                     "Estado de batería: ${batt.level}% ($chargingStr). Temperatura: ${String.format("%.1f", batt.temperatureCelsius)}°C."
+                }
+
+                // Current date and time
+                "GET_CURRENT_DATETIME" -> {
+                    val now = ZonedDateTime.now()
+                    val date = now.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    val time = now.format(DateTimeFormatter.ofPattern("HH:mm"))
+                    val zone = now.zone.id
+                    "Son las $time del $date. Zona horaria: $zone."
                 }
 
                 // Alarms & Timers
