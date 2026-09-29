@@ -460,6 +460,15 @@ private fun ProviderFilterChipsRow(
             onClick = { onSelectProvider(ModelProvider.ANTHROPIC) }
         )
 
+        // Offline GGUF Chip
+        ProviderChip(
+            label = "🧠 OFFLINE",
+            icon = Icons.Default.Memory,
+            isSelected = selectedProvider == ModelProvider.LOCAL_GGUF,
+            brandColor = JarvisAccentGreen,
+            onClick = { onSelectProvider(ModelProvider.LOCAL_GGUF) }
+        )
+
         // OpenRouter Chip
         ProviderChip(
             label = "🔀 OPENROUTER",
@@ -830,6 +839,7 @@ private fun getProviderColor(provider: ModelProvider): Color = when (provider) {
     ModelProvider.ANTHROPIC -> Color(0xFFD97706)
     ModelProvider.OPENROUTER -> Color(0xFF8B5CF6)
     ModelProvider.CUSTOM_OPENAI -> Color(0xFF00B0FF)
+    ModelProvider.LOCAL_GGUF -> JarvisAccentGreen
 }
 
 private fun getProviderIcon(provider: ModelProvider): ImageVector = when (provider) {
@@ -837,6 +847,7 @@ private fun getProviderIcon(provider: ModelProvider): ImageVector = when (provid
     ModelProvider.GROQ -> Icons.Default.Lightbulb
     ModelProvider.DEEPSEEK -> Icons.Default.BubbleChart
     ModelProvider.CUSTOM_OPENAI -> Icons.Default.Code
+    ModelProvider.LOCAL_GGUF -> Icons.Default.Memory
     else -> Icons.Default.Settings
 }
 
