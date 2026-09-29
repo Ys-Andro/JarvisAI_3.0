@@ -133,14 +133,6 @@ val PROVIDERS_META = listOf(
         placeholder = "Clave opcional para tu servidor",
         hint = "Conecta con tu propia dirección de servidor compatible.",
         brandColor = Color(0xFF00B0FF)
-    ),
-    ProviderMeta(
-        id = "local_llama",
-        name = "Llama PC",
-        badge = "OFFLINE",
-        placeholder = "http://192.168.1.100:8080",
-        hint = "Conecta JARVIS al llama-server de tu PC. No requiere API Key.",
-        brandColor = Color(0xFF00E5FF)
     )
 )
 
@@ -159,7 +151,6 @@ fun ProviderApiKeySection(
 
     val currentKey = when (selectedProviderId) {
         "gemini" -> uiState.apiKey ?: ""
-        "local_llama" -> uiState.customOpenAiEndpoint ?: ""
         else -> uiState.providerApiKeys[selectedProviderId] ?: ""
     }
 
@@ -187,10 +178,10 @@ fun ProviderApiKeySection(
         ) {
             PROVIDERS_META.forEach { provider ->
                 val isSelected = selectedProviderId == provider.id
-                val hasKey = when (provider.id) {
-                    "gemini" -> !uiState.apiKey.isNullOrBlank()
-                    "local_llama" -> !uiState.customOpenAiEndpoint.isNullOrBlank()
-                    else -> !uiState.providerApiKeys[provider.id].isNullOrBlank()
+                val hasKey = if (provider.id == "gemini") {
+                    !uiState.apiKey.isNullOrBlank()
+                } else {
+                    !uiState.providerApiKeys[provider.id].isNullOrBlank()
                 }
 
                 Surface(
@@ -260,10 +251,10 @@ fun ProviderApiKeySection(
                         fontFamily = FontFamily.Monospace
                     )
 
-                    val isKeyConfigured = when (currentProvider.id) {
-                        "gemini" -> !uiState.apiKey.isNullOrBlank()
-                        "local_llama" -> !uiState.customOpenAiEndpoint.isNullOrBlank()
-                        else -> !uiState.providerApiKeys[currentProvider.id].isNullOrBlank()
+                    val isKeyConfigured = if (currentProvider.id == "gemini") {
+                        !uiState.apiKey.isNullOrBlank()
+                    } else {
+                        !uiState.providerApiKeys[currentProvider.id].isNullOrBlank()
                     }
 
                     Surface(
@@ -312,11 +303,7 @@ fun ProviderApiKeySection(
                 )
             },
             singleLine = true,
-            visualTransformation = if (currentProvider.id == "local_llama" || isPasswordVisible) {
-                VisualTransformation.None
-            } else {
-                PasswordVisualTransformation()
-            },
+            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (keyInput.isNotEmpty()) {
@@ -396,13 +383,7 @@ fun ProviderApiKeySection(
         ) {
             OutlinedButton(
                 onClick = {
-                    validationResult = if (currentProvider.id == "local_llama") {
-                        val endpoint = keyInput.trim()
-                        val valid = endpoint.startsWith("http://") || endpoint.startsWith("https://")
-                        Pair(valid, if (valid) "Dirección de llama-server válida" else "Introduce una URL HTTP/HTTPS válida")
-                    } else {
-                        onVerifyKey(currentProvider.id, keyInput)
-                    }
+                    validationResult = onVerifyKey(currentProvider.id, keyInput)
                 },
                 shape = RoundedCornerShape(8.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder),
@@ -424,10 +405,10 @@ fun ProviderApiKeySection(
             Button(
                 onClick = {
                     val trimmed = keyInput.trim()
-                    when (currentProvider.id) {
-                        "gemini" -> onSaveGeminiKey(trimmed)
-                        "local_llama" -> onSaveCustomEndpoint(trimmed)
-                        else -> onSaveProviderKey(currentProvider.id, trimmed)
+                    if (currentProvider.id == "gemini") {
+                        onSaveGeminiKey(trimmed)
+                    } else {
+                        onSaveProviderKey(currentProvider.id, trimmed)
                     }
                 },
                 shape = RoundedCornerShape(8.dp),
@@ -451,7 +432,7 @@ fun ProviderApiKeySection(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = if (currentProvider.id == "local_llama") "GUARDAR DIRECCIÓN" else "GUARDAR CLAVE",
+                        text = "GUARDAR CLAVE",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
