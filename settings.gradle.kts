@@ -29,4 +29,3 @@ dependencyResolutionManagement {
 rootProject.name = "JarvisAI"
 
 include(":app")
-include(":desktopApp")
