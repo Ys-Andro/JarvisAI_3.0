@@ -48,6 +48,7 @@ class AgentCore(
 
                 when (executed.status) {
                     TaskStatus.COMPLETED -> { index++; continue }
+                    TaskStatus.PENDING -> { continue }
                     TaskStatus.CANCELLED -> {
                         markRemainingAsSkipped(tasks, index + 1)
                         onTaskUpdate(tasks.toList())
