@@ -5,6 +5,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +70,7 @@ import com.example.jarvisai.presentation.models.ModelsViewModel
 import com.example.jarvisai.presentation.settings.components.AgentSelectorSection
 import com.example.jarvisai.presentation.settings.components.GenerationParamsSection
 import com.example.jarvisai.presentation.settings.components.MemoryDocsSection
+import com.example.jarvisai.presentation.settings.components.OfflineModelSection
 import com.example.jarvisai.presentation.settings.components.ProviderApiKeySection
 import com.example.jarvisai.presentation.settings.components.SettingsCategory
 import com.example.jarvisai.presentation.settings.components.SettingsCategoryTabs
@@ -113,6 +116,14 @@ fun SettingsScreen(
     var isVoiceExpanded by remember { mutableStateOf(false) }
     var isMemoryExpanded by remember { mutableStateOf(false) }
     var isThemeExpanded by remember { mutableStateOf(false) }
+
+    val offlineModelPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importOfflineModel(uri)
+        }
+    }
 
     Scaffold(
         modifier = modifier
@@ -272,6 +283,13 @@ fun SettingsScreen(
                                 onSaveCustomEndpoint = { endpoint -> viewModel.updateCustomOpenAiEndpoint(endpoint) },
                                 onSelectModel = { modelId -> viewModel.updateSelectedGeminiModel(modelId) },
                                 onVerifyKey = { provider, key -> viewModel.verifyApiKey(provider, key) }
+                            )
+                            OfflineModelSection(
+                                modelPath = uiState.offlineModelPath,
+                                onImportModel = {
+                                    offlineModelPickerLauncher.launch(arrayOf("application/octet-stream", "application/x-gguf", "*/*"))
+                                },
+                                onRemoveModel = { viewModel.removeOfflineModel() }
                             )
                         }
                     }
