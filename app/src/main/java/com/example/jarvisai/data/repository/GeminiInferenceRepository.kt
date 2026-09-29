@@ -6,6 +6,7 @@ import com.example.BuildConfig
 import com.example.jarvisai.data.api.gemini.GeminiApiClient
 import com.example.jarvisai.data.api.multi.UniversalAiApiClient
 import com.example.jarvisai.data.util.DeviceController
+import com.example.jarvisai.data.offline.LocalGgufEngine
 import com.example.jarvisai.domain.model.CloudAiModel
 import com.example.jarvisai.domain.model.GenerationSettings
 import com.example.jarvisai.domain.model.InferenceState
@@ -53,6 +54,10 @@ class GeminiInferenceRepository(
     override val inferenceState: Flow<InferenceState> = _inferenceState.asStateFlow()
 
     private var currentStreamJob: Job? = null
+
+    private val localGgufEngine by lazy {
+        LocalGgufEngine(context, settingsRepository)
+    }
 
     private val networkMonitor by lazy {
         com.example.jarvisai.data.util.NetworkMonitor(context)
@@ -198,16 +203,27 @@ class GeminiInferenceRepository(
 
         _inferenceState.value = InferenceState.Generating(partialText = "", tokensPerSecond = 0f)
 
-        universalApiClient.streamCompletion(
-            apiKey = apiKey,
-            model = modelDef,
-            prompt = prompt,
-            history = conversationHistory,
-            settings = effectiveSettings,
-            customBaseUrl = customBaseUrl,
-            imageBase64 = imageBase64,
-            imageMimeType = imageMimeType
-        ).collect { tokenChunk ->
+        val tokenFlow = if (isOfflineLocal) {
+            localGgufEngine.generate(
+                prompt = prompt,
+                history = conversationHistory,
+                systemPrompt = effectiveSettings.systemPrompt,
+                predictLength = effectiveSettings.maxTokens
+            )
+        } else {
+            universalApiClient.streamCompletion(
+                apiKey = apiKey,
+                model = modelDef,
+                prompt = prompt,
+                history = conversationHistory,
+                settings = effectiveSettings,
+                customBaseUrl = customBaseUrl,
+                imageBase64 = imageBase64,
+                imageMimeType = imageMimeType
+            )
+        }
+
+        tokenFlow.collect { tokenChunk ->
             generatedTokens++
             accumulatedText.append(tokenChunk)
 
@@ -230,7 +246,7 @@ class GeminiInferenceRepository(
         }
     }
         .onStart {
-            Log.i(TAG, "Starting multi-model cloud completion stream.")
+            Log.i(TAG, if (CloudAiModel.findById(runCatching { settingsRepository.getSelectedGeminiModel().first() }.getOrDefault(DEFAULT_MODEL)).provider == ModelProvider.LOCAL_GGUF) "Starting embedded GGUF completion stream." else "Starting multi-model completion stream.")
         }
         .onCompletion { cause ->
             if (cause != null) {
