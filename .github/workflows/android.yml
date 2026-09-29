@@ -32,11 +32,19 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
-      - name: Debug keystore
+      - name: Restore stable development signing key
         run: |
-          if [ ! -f debug.keystore ]; then
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          set -e
+          echo "${{ secrets.JARVIS_CI_KEYSTORE_BASE64 }}" | base64 --decode > debug.keystore
+          if [ ! -s debug.keystore ]; then
+            echo "Missing JARVIS_CI_KEYSTORE_BASE64 repository secret" >&2
+            exit 1
           fi
+
+      - name: Set upgrade-safe app version
+        run: |
+          echo "JARVIS_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "JARVIS_VERSION_NAME=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
       - name: Build Debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
