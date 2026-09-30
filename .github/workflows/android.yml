@@ -46,6 +46,9 @@ jobs:
           echo "JARVIS_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
           echo "JARVIS_VERSION_NAME=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
+      - name: Run unit tests
+        run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
+
       - name: Build Debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
