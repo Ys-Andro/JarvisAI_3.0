@@ -105,6 +105,10 @@ class UniversalAiApiClient(
         imageMimeType: String? = null
     ): Flow<String> = flow {
         val endpoint = "$baseUrl/chat/completions"
+        val endpointUrl = URL(endpoint)
+        if (endpointUrl.protocol != "https" && endpointUrl.host !in setOf("localhost", "127.0.0.1")) {
+            throw IllegalStateException("Solo se permiten endpoints HTTPS fuera del dispositivo local.")
+        }
         val requestJson = JSONObject().apply {
             put("model", modelId)
             put("stream", true)
@@ -164,13 +168,12 @@ class UniversalAiApiClient(
         var reader: BufferedReader? = null
 
         try {
-            val url = URL(endpoint)
-            connection = (url.openConnection() as HttpURLConnection).apply {
+            connection = (endpointUrl.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doOutput = true
                 doInput = true
-                connectTimeout = 15000
-                readTimeout = 30000
+                connectTimeout = 12000
+                readTimeout = 60000
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "text/event-stream")
                 if (apiKey.isNotBlank()) {
@@ -211,15 +214,20 @@ class UniversalAiApiClient(
                             if (choices != null && choices.length() > 0) {
                                 val delta = choices.getJSONObject(0).optJSONObject("delta")
                                 var text = delta?.optString("content", "") ?: ""
-                                if (firstQwenContentChunk) {
+                                if (firstQwenContentChunk && text.isNotEmpty()) {
                                     text = text.replace(Regex("^(?i:null\\s*)+"), "")
                                     firstQwenContentChunk = false
                                 }
                                 if (text.isNotEmpty()) {
                                     emit(text)
                                 }
+                            } else {
+                                val error = json.optJSONObject("error")?.optString("message")
+                                if (!error.isNullOrBlank()) throw IllegalStateException(error)
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            if (e is IllegalStateException) throw e
+                        }
                     }
                 }
             }

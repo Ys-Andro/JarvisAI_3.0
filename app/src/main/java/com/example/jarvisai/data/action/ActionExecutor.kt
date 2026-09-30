@@ -1,6 +1,7 @@
 package com.example.jarvisai.data.action
 
 import android.content.Context
+import com.example.jarvisai.data.automation.AutomationScheduler
 import com.example.jarvisai.data.util.DeviceController
 import com.example.jarvisai.domain.repository.IMemoryRepository
 import org.json.JSONObject
@@ -11,6 +12,7 @@ class ActionExecutor(
 ) {
     private val validator = ActionValidator()
     private val policy = PermissionPolicy()
+    private val automationScheduler = AutomationScheduler(context, com.example.jarvisai.data.local.database.JarvisDatabase.getInstance(context).automationDao())
 
     suspend fun executeActionJson(jsonString: String): ActionExecutionResult {
         return try {
@@ -36,8 +38,60 @@ class ActionExecutor(
                 return policyResult
             }
 
-            // Handle special repository-level actions
+            // Handle persistent automation actions before device execution.
             when (request.action) {
+                "SCHEDULE_ACTION" -> {
+                    val title = json.optString("title", "Automatización Jarvis").trim()
+                    val delaySeconds = json.optLong("delaySeconds", -1L)
+                    val triggerAt = json.optLong("triggerAt", -1L).let {
+                        if (it > System.currentTimeMillis()) it
+                        else if (delaySeconds > 0) System.currentTimeMillis() + delaySeconds * 1000L
+                        else -1L
+                    }
+                    val intervalMinutes = json.optLong("intervalMinutes", 0L)
+                    val actionJson = json.optString("actionJson", "").trim()
+                    if (triggerAt <= System.currentTimeMillis() || actionJson.isBlank()) {
+                        return ActionExecutionResult.Error("SCHEDULE_ACTION requiere triggerAt futuro o delaySeconds y un actionJson válido.")
+                    }
+                    val scheduledAction = try { JSONObject(actionJson).optString("action").uppercase() } catch (_: Exception) { "" }
+                    if (ActionRegistry.isSensitive(scheduledAction)) {
+                        return ActionExecutionResult.RequiresConfirmation(
+                            request,
+                            "La automatización contiene una acción sensible ($scheduledAction) y requiere confirmación explícita."
+                        )
+                    }
+                    val id = automationScheduler.schedule(title, triggerAt, actionJson, intervalMinutes)
+                    return ActionExecutionResult.Success("Automatización programada: $title (ID $id).")
+                }
+                "CANCEL_AUTOMATION" -> {
+                    val id = json.optString("id", "").trim()
+                    if (id.isBlank()) return ActionExecutionResult.Error("Falta el ID de la automatización.")
+                    automationScheduler.cancel(id)
+                    return ActionExecutionResult.Success("Automatización cancelada.")
+                }
+                "SHOW_REMINDER" -> {
+                    val title = json.optString("title", "JARVIS").trim().ifBlank { "JARVIS" }
+                    val message = json.optString("message", "Recordatorio de JARVIS").trim()
+                    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                    val channelId = "jarvis_reminders"
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        manager.createNotificationChannel(
+                            android.app.NotificationChannel(
+                                channelId,
+                                "Recordatorios JARVIS",
+                                android.app.NotificationManager.IMPORTANCE_HIGH
+                            )
+                        )
+                    }
+                    val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+                        .setSmallIcon(com.example.R.mipmap.ic_launcher)
+                        .setContentTitle(title)
+                        .setContentText(message)
+                        .setAutoCancel(true)
+                        .build()
+                    manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification)
+                    return ActionExecutionResult.Success("Recordatorio mostrado.")
+                }
                 "SAVE_MEMORY" -> {
                     val key = json.optString("key", "Dato").trim()
                     val value = json.optString("value", "").trim()

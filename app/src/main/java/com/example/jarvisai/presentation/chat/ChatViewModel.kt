@@ -479,7 +479,7 @@ class ChatViewModel(
 
     private fun shouldUseAgent(prompt: String): Boolean {
         val normalized = prompt.lowercase()
-        val actionSignals = listOf("abre ", "abrir ", "cierra ", "cerrar ", "pon ", "poner ", "activa ", "activar ", "desactiva ", "enciende ", "apaga ", "llama ", "llamar ", "manda ", "enviar ", "envía ", "navega ", "buscar ", "busca ", "reproduce ", "reproducir ", "crea una alarma", "pon una alarma", "temporizador", "toma una captura", "lee la pantalla", "guarda en memoria", "recuerda ", "ejecuta ")
+        val actionSignals = listOf("abre ", "abrir ", "cierra ", "cerrar ", "pon ", "poner ", "activa ", "activar ", "desactiva ", "enciende ", "apaga ", "llama ", "llamar ", "manda ", "enviar ", "envía ", "navega ", "buscar ", "busca ", "reproduce ", "reproducir ", "crea una alarma", "pon una alarma", "temporizador", "toma una captura", "lee la pantalla", "guarda en memoria", "recuerda ", "recuérdame", "programa ", "programar ", "cada día", "cada semana", "cada lunes", "en 10 minutos", "en una hora", "ejecuta ")
         val multiStepSignals = listOf(" y luego ", " después ", " luego ", "y también", "primero ", "ahora hazlo", "ahora haz lo mismo", "haz lo mismo", "lo mismo", "el segundo", "el anterior", "esa configuración", "eso", "esa acción", "aquello")
         return actionSignals.any(normalized::contains) || multiStepSignals.any(normalized::contains)
     }
@@ -566,7 +566,16 @@ class ChatViewModel(
                 )
             }
 
-            val finalResponse = responseBuilder.toString()
+            val rawFinalResponse = responseBuilder.toString()
+            val finalResponse = sanitizeAssistantResponse(rawFinalResponse)
+            if (finalResponse != rawFinalResponse) {
+                conversationRepository.updateMessageContent(
+                    messageId = assistantMsgId,
+                    content = finalResponse,
+                    tokensPerSec = finalTokPerSec,
+                    durationMs = finalElapsedMs
+                )
+            }
             if (settings.autoTts && finalResponse.isNotBlank()) {
                 speakText(finalResponse)
             }
@@ -661,6 +670,13 @@ class ChatViewModel(
                 onResponseComplete(finalResponse)
             }
         }
+    }
+
+    private fun sanitizeAssistantResponse(text: String): String {
+        return text
+            .replace(Regex("\\[JARVIS_ACTION:\\s*\\{[\\s\\S]*?\\}\\]"), "")
+            .replace(Regex("\\n{3,}"), "\\n\\n")
+            .trim()
     }
 
     fun speakText(text: String) {

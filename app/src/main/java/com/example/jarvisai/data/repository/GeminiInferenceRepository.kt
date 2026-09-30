@@ -5,6 +5,9 @@ import android.util.Log
 import com.example.BuildConfig
 import com.example.jarvisai.data.api.gemini.GeminiApiClient
 import com.example.jarvisai.data.api.multi.UniversalAiApiClient
+import com.example.jarvisai.data.ai.InferenceErrorMapper
+import com.example.jarvisai.data.ai.ModelRouter
+import com.example.jarvisai.data.agent.AgentContextManager
 import com.example.jarvisai.data.util.DeviceController
 import com.example.jarvisai.domain.model.CloudAiModel
 import com.example.jarvisai.domain.model.GenerationSettings
@@ -41,6 +44,7 @@ class GeminiInferenceRepository(
     private val settingsRepository: ISettingsRepository,
     private val memoryRepository: IMemoryRepository,
     private val documentRepository: IDocumentRepository,
+    private val conversationRepository: com.example.jarvisai.domain.repository.IConversationRepository,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : IInferenceRepository {
 
@@ -53,6 +57,12 @@ class GeminiInferenceRepository(
     override val inferenceState: Flow<InferenceState> = _inferenceState.asStateFlow()
 
     private var currentStreamJob: Job? = null
+
+    private val modelRouter by lazy { ModelRouter(settingsRepository) }
+
+    private val contextManager by lazy {
+        AgentContextManager(conversationRepository, memoryRepository, documentRepository)
+    }
 
     private val networkMonitor by lazy {
         com.example.jarvisai.data.util.NetworkMonitor(context)
@@ -99,8 +109,8 @@ class GeminiInferenceRepository(
         imageMimeType: String?
     ): Flow<String> = flow {
         val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
-        val modelDef = CloudAiModel.findById(selectedModelId)
-        val isLocalQwen = modelDef.id == "local-qwen-hf"
+        val primaryModel = CloudAiModel.findById(selectedModelId)
+        val isLocalQwen = primaryModel.id == "local-qwen-hf"
 
         if (!isLocalQwen && !networkMonitor.isCurrentlyOnline) {
             val noConnectionMsg = "No hay conexión a internet. Revisa tu conexión Wi-Fi o datos móviles para conversar con el asistente."
@@ -109,22 +119,15 @@ class GeminiInferenceRepository(
             return@flow
         }
 
-        val apiKey = resolveApiKeyForProvider(modelDef.provider)
-        if (!isLocalQwen && apiKey.isBlank()) {
-            val errorMsg = "Por favor ingresa tu API Key para ${modelDef.provider.displayName} en Ajustes."
-            _inferenceState.value = InferenceState.Error(errorMsg)
-            emit("⚠️ $errorMsg\n\nPuedes ingresar tu API Key en Ajustes o seleccionar Google Gemini en la barra superior.")
-            return@flow
-        }
+        // Bounded working context shared by normal chat and the agent.
+        val agentContext = contextManager.build(
+            goal = prompt,
+            suppliedHistory = conversationHistory
+        )
+        val ragAugmentedContext = agentContext.relevantKnowledge
 
-        // Fetch active agent personality, long-term memories, and saved knowledge documents
         val agentId = settingsRepository.getSelectedAgentId().first()
         val agent = com.example.jarvisai.domain.model.Agent.findById(agentId)
-        val memories = memoryRepository.getAllMemories().first()
-        val documents = documentRepository.getAllDocuments().first()
-
-        val contextProvider = com.example.jarvisai.data.rag.ContextProvider()
-        val ragAugmentedContext = contextProvider.buildAugmentedContext(prompt, documents, memories)
 
         val combinedSystemPrompt = if (isLocalQwen) {
             buildString {
@@ -182,39 +185,61 @@ class GeminiInferenceRepository(
             temperature = if (isLocalQwen) 0.45f else settings.temperature
         )
 
-        val customBaseUrl = if (modelDef.provider == ModelProvider.CUSTOM_OPENAI && !isLocalQwen) {
-            settingsRepository.getCustomOpenAiEndpoint().first()
-        } else null
-
         val startTime = System.currentTimeMillis()
         var generatedTokens = 0
         val accumulatedText = StringBuilder()
+        var emittedAnyContent = false
+        var lastFailure: Throwable? = null
 
         _inferenceState.value = InferenceState.Generating(partialText = "", tokensPerSecond = 0f)
 
-        universalApiClient.streamCompletion(
-            apiKey = apiKey,
-            model = modelDef,
-            prompt = prompt,
-            history = conversationHistory,
-            settings = effectiveSettings,
-            customBaseUrl = customBaseUrl,
-            imageBase64 = imageBase64,
-            imageMimeType = imageMimeType
-        ).collect { tokenChunk ->
-            generatedTokens++
-            accumulatedText.append(tokenChunk)
+        for (candidate in modelRouter.candidates(selectedModelId)) {
+            val candidateIsLocal = candidate.id == "local-qwen-hf"
+            if (!candidateIsLocal && !networkMonitor.isCurrentlyOnline) continue
 
-            val elapsedSec = (System.currentTimeMillis() - startTime).coerceAtLeast(1L) / 1000.0f
-            val tokPerSec = if (elapsedSec > 0f) generatedTokens / elapsedSec else 0f
+            val apiKey = resolveApiKeyForProvider(candidate.provider)
+            if (!candidateIsLocal && apiKey.isBlank()) continue
 
-            _inferenceState.value = InferenceState.Generating(
-                partialText = accumulatedText.toString(),
-                tokensPerSecond = tokPerSec
-            )
+            val customBaseUrl = if (candidate.provider == ModelProvider.CUSTOM_OPENAI && !candidateIsLocal) {
+                settingsRepository.getCustomOpenAiEndpoint().first()
+            } else null
 
-            emit(tokenChunk)
+            try {
+                universalApiClient.streamCompletion(
+                    apiKey = apiKey,
+                    model = candidate,
+                    prompt = prompt,
+                    history = conversationHistory,
+                    settings = effectiveSettings.copy(
+                        maxTokens = if (candidateIsLocal) minOf(effectiveSettings.maxTokens, 512) else effectiveSettings.maxTokens,
+                        temperature = if (candidateIsLocal) 0.45f else effectiveSettings.temperature
+                    ),
+                    customBaseUrl = customBaseUrl,
+                    imageBase64 = imageBase64,
+                    imageMimeType = imageMimeType
+                ).collect { tokenChunk ->
+                    if (tokenChunk.isNotEmpty()) emittedAnyContent = true
+                    generatedTokens++
+                    accumulatedText.append(tokenChunk)
+
+                    val elapsedSec = (System.currentTimeMillis() - startTime).coerceAtLeast(1L) / 1000.0f
+                    val tokPerSec = if (elapsedSec > 0f) generatedTokens / elapsedSec else 0f
+                    _inferenceState.value = InferenceState.Generating(
+                        partialText = accumulatedText.toString(),
+                        tokensPerSecond = tokPerSec
+                    )
+                    emit(tokenChunk)
+                }
+                lastFailure = null
+                break
+            } catch (t: Throwable) {
+                lastFailure = t
+                if (emittedAnyContent) throw t
+                Log.w(TAG, "Model ${candidate.id} failed before output; trying fallback: ${t.message}")
+            }
         }
+
+        if (lastFailure != null && accumulatedText.isEmpty()) throw lastFailure
 
         val finalResponse = accumulatedText.toString()
             .trim()
@@ -240,12 +265,7 @@ class GeminiInferenceRepository(
         }
         .catch { e ->
             Log.w(TAG, "AI stream issue: ${e.message}")
-            val errorMsg = e.message ?: ""
-            val friendlyMsg = if (errorMsg.contains("429") || errorMsg.contains("503") || errorMsg.contains("overloaded") || errorMsg.contains("quota") || errorMsg.contains("resource_exhausted")) {
-                "El servicio está temporalmente ocupado o sin cuota disponible. Por favor, intenta de nuevo en unos minutos."
-            } else {
-                "No se pudo completar la respuesta: ${e.message ?: "Error de comunicación"}"
-            }
+            val friendlyMsg = InferenceErrorMapper.friendly(e.message)
             _inferenceState.value = InferenceState.Error(friendlyMsg)
             emit(friendlyMsg)
         }
