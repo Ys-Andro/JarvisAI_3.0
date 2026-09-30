@@ -196,6 +196,7 @@ class UniversalAiApiClient(
 
             reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))
             var line: String?
+            var firstQwenContentChunk = modelId == "local-qwen-hf"
 
             while (currentCoroutineContext().isActive) {
                 line = reader.readLine() ?: break
@@ -209,7 +210,11 @@ class UniversalAiApiClient(
                             val choices = json.optJSONArray("choices")
                             if (choices != null && choices.length() > 0) {
                                 val delta = choices.getJSONObject(0).optJSONObject("delta")
-                                val text = delta?.optString("content", "") ?: ""
+                                var text = delta?.optString("content", "") ?: ""
+                                if (firstQwenContentChunk) {
+                                    text = text.replace(Regex("^(?i:null\\s*)+"), "")
+                                    firstQwenContentChunk = false
+                                }
                                 if (text.isNotEmpty()) {
                                     emit(text)
                                 }
