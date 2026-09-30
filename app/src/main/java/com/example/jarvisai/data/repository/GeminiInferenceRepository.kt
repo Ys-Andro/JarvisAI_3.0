@@ -126,65 +126,61 @@ class GeminiInferenceRepository(
         val contextProvider = com.example.jarvisai.data.rag.ContextProvider()
         val ragAugmentedContext = contextProvider.buildAugmentedContext(prompt, documents, memories)
 
-        val combinedSystemPrompt = buildString {
-            append(agent.systemPrompt)
-            val userPrompt = settings.systemPrompt
-            if (userPrompt.isNotBlank() && !userPrompt.contains("You are Jarvis") && userPrompt != "Eres Jarvis, un asistente de IA avanzado, eficiente, sofisticado y servicial inspirado en el asistente de Iron Man.") {
-                append("\n\n$userPrompt")
+        val combinedSystemPrompt = if (isLocalQwen) {
+            buildString {
+                append("""
+                    Eres JARVIS, un asistente personal para Android.
+                    Responde siempre en español, de forma natural, clara y útil.
+                    Responde directamente a lo que el usuario acaba de decir y conserva el contexto de la conversación.
+                    Si el usuario pregunta cómo estás, responde brevemente como asistente y continúa la conversación.
+                    No inventes datos ni capacidades.
+                    No escribas etiquetas técnicas, JSON, XML ni texto de control salvo que se te solicite.
+                """.trimIndent())
+                if (ragAugmentedContext.isNotBlank()) {
+                    append("\n\n")
+                    append(ragAugmentedContext)
+                }
             }
-            append(ragAugmentedContext)
-            append("""
-                
-                [CAPACIDAD DE CONTROL TOTAL DEL DISPOSITIVO Y AUTOMATIZACIÓN - JARVIS DEVICE AGENT]:
-                Eres Jarvis, un asistente de IA de élite capaz de controlar el teléfono Android del usuario en tiempo real en respuesta a comandos de voz o texto en lenguaje natural.
-                Cuando el usuario solicite una acción física, control de ajustes, apertura de apps, llamadas, mensajes, alarmas, interactuar con la pantalla o guardar memorias personales, formula tu respuesta con cortesía y estilo Jarvis y añade AL FINAL DE TU RESPUESTA el comando de acción en formato estructurado:
-                [JARVIS_ACTION: {"action":"NOMBRE_ACCION", ...parámetros}]
+        } else {
+            buildString {
+                append(agent.systemPrompt)
+                val userPrompt = settings.systemPrompt
+                if (userPrompt.isNotBlank() && !userPrompt.contains("You are Jarvis") && userPrompt != "Eres Jarvis, un asistente de IA avanzado, eficiente, sofisticado y servicial inspirado en el asistente de Iron Man.") {
+                    append("\n\n$userPrompt")
+                }
+                append(ragAugmentedContext)
+                append("""
+                    
+                    [CAPACIDAD DE CONTROL TOTAL DEL DISPOSITIVO Y AUTOMATIZACIÓN - JARVIS DEVICE AGENT]:
+                    Eres Jarvis, un asistente de IA de élite capaz de controlar el teléfono Android del usuario en tiempo real en respuesta a comandos de voz o texto en lenguaje natural.
+                    Cuando el usuario solicite una acción física, control de ajustes, apertura de apps, llamadas, mensajes, alarmas, interactuar con la pantalla o guardar memorias personales, formula tu respuesta con cortesía y estilo Jarvis y añade AL FINAL DE TU RESPUESTA el comando de acción en formato estructurado:
+                    [JARVIS_ACTION: {"action":"NOMBRE_ACCION", ...parámetros}]
 
-                [REGLA DE SEGURIDAD CRÍTICA Y PREVENCIÓN DE ACCIONES NO SOLICITADAS]:
-                - SOLO debes incluir el bloque [JARVIS_ACTION: ...] si el usuario te ha solicitado de manera EXPLÍCITA y DIRECTA realizar un control físico, guardar datos o interactuar con la pantalla.
-                - NUNCA, bajo ningún concepto, ejecutes acciones intrusivas como "SCREENSHOT" (captura de pantalla) o "READ_SCREEN" (leer pantalla) de manera automática. SOLO si el usuario lo pide explícitamente con comandos como: "toma captura de pantalla", "lee la pantalla", "qué hay en pantalla".
-                - Si el usuario te hace una pregunta informativa, de charla, o cualquier consulta normal que no requiera actuar sobre el sistema, NO incluyas ningún bloque [JARVIS_ACTION: ...].
+                    [REGLA DE SEGURIDAD CRÍTICA Y PREVENCIÓN DE ACCIONES NO SOLICITADAS]:
+                    - SOLO debes incluir el bloque [JARVIS_ACTION: ...] si el usuario te ha solicitado de manera EXPLÍCITA y DIRECTA realizar un control físico, guardar datos o interactuar con la pantalla.
+                    - NUNCA ejecutes SCREENSHOT o READ_SCREEN automáticamente. Solo si el usuario lo solicita explícitamente.
+                    - Si el usuario hace una pregunta informativa o de charla, NO incluyas [JARVIS_ACTION: ...].
 
-                CATÁLOGO DE ACCIONES DE HARDWARE Y SISTEMA SOPORTADAS:
-                1. Linterna:
-                   {"action":"FLASHLIGHT", "enable": true/false}
-                2. Volumen y Audio:
-                   {"action":"VOLUME", "level": int 0-100} o {"action":"MUTE"}
-                3. Batería y Telemetría:
-                   {"action":"BATTERY_STATUS"}
-                4. Alarmas y Temporizadores:
-                   {"action":"SET_ALARM", "hour": int (0-23), "minute": int (0-59), "message": "..."}
-                   {"action":"SET_TIMER", "seconds": int, "message": "..."}
-                5. Aplicaciones e Integraciones:
-                   {"action":"OPEN_APP", "appName": "nombre_app"} (ej. WhatsApp, YouTube, Spotify, Cámara, Ajustes, Gmail, Maps, Calendario)
-                   {"action":"WHATSAPP_MESSAGE", "phone": "opcional_con_codigo_pais", "message": "texto_a_enviar"}
-                   {"action":"YOUTUBE_SEARCH", "query": "busqueda"}
-                   {"action":"MAPS_NAVIGATE", "destination": "direccion_o_lugar"}
-                   {"action":"SPOTIFY_PLAY", "query": "cancion o artista"}
-                   {"action":"CALL", "number": "numero_telefonico"}
-                   {"action":"WEB_SEARCH", "query": "termino_de_busqueda"}
-                   {"action":"OPEN_URL", "url": "enlace_web"}
-                6. Memoria y Datos Persistentes:
-                   {"action":"SAVE_MEMORY", "key":"titulo_o_clave", "value":"dato_a_recordar", "category":"GENERAL"} (Categorías: PERSONAL, TRABAJO, GENERAL, SALUD, PREFERENCIAS)
-                   {"action":"DELETE_MEMORY", "id": 123} o {"action":"DELETE_MEMORY", "key":"clave"}
-                7. Notificaciones:
-                   {"action":"READ_NOTIFICATIONS"}
-                8. Gestos y Navegación de Pantalla (Accesibilidad):
-                   {"action":"HOME"}, {"action":"BACK"}, {"action":"RECENTS"}, {"action":"NOTIFICATIONS"}, {"action":"QUICK_SETTINGS"}, {"action":"LOCK_SCREEN"}, {"action":"SCREENSHOT"}
-                   {"action":"SCROLL_DOWN"}, {"action":"SCROLL_UP"}
-                   {"action":"CLICK_TEXT", "text": "texto_del_boton"}
-                   {"action":"TYPE_TEXT", "text": "texto_a_escribir"}
-                   {"action":"READ_SCREEN"}
-                9. Ajustes de Conectividad:
-                   {"action":"OPEN_SETTINGS"}, {"action":"OPEN_WIFI"}, {"action":"OPEN_BLUETOOTH"}, {"action":"OPEN_ACCESSIBILITY_SETTINGS"}
-                10. Háptico:
-                   {"action":"VIBRATE", "durationMs": int}
-
-                Ejecuta siempre las acciones solicitadas con precisión.
-            """.trimIndent())
+                    CATÁLOGO DE ACCIONES DE HARDWARE Y SISTEMA SOPORTADAS:
+                    1. {"action":"FLASHLIGHT", "enable": true/false}
+                    2. {"action":"VOLUME", "level": int 0-100} o {"action":"MUTE"}
+                    3. {"action":"BATTERY_STATUS"}
+                    4. {"action":"SET_ALARM", "hour": int, "minute": int, "message": "..."} / {"action":"SET_TIMER", "seconds": int, "message": "..."}
+                    5. {"action":"OPEN_APP", "appName": "nombre_app"} / {"action":"CALL", "number": "numero"} / {"action":"WEB_SEARCH", "query": "termino"} / {"action":"OPEN_URL", "url": "enlace"}
+                    6. {"action":"SAVE_MEMORY", "key":"clave", "value":"dato","category":"GENERAL"} / {"action":"DELETE_MEMORY", "id": 123}
+                    7. {"action":"READ_NOTIFICATIONS"}
+                    8. {"action":"HOME"} / {"action":"BACK"} / {"action":"RECENTS"} / {"action":"NOTIFICATIONS"} / {"action":"QUICK_SETTINGS"} / {"action":"LOCK_SCREEN"} / {"action":"SCREENSHOT"} / {"action":"READ_SCREEN"} / {"action":"SCROLL_DOWN"} / {"action":"SCROLL_UP"} / {"action":"CLICK_TEXT", "text":"texto"} / {"action":"TYPE_TEXT", "text":"texto"}
+                    9. {"action":"OPEN_SETTINGS"} / {"action":"OPEN_WIFI"} / {"action":"OPEN_BLUETOOTH"} / {"action":"OPEN_ACCESSIBILITY_SETTINGS"}
+                    10. {"action":"VIBRATE", "durationMs": int}
+                """.trimIndent())
+            }
         }
 
-        val effectiveSettings = settings.copy(systemPrompt = combinedSystemPrompt)
+        val effectiveSettings = settings.copy(
+            systemPrompt = combinedSystemPrompt,
+            maxTokens = if (isLocalQwen) minOf(settings.maxTokens, 512) else settings.maxTokens,
+            temperature = if (isLocalQwen) 0.45f else settings.temperature
+        )
 
         val customBaseUrl = if (modelDef.provider == ModelProvider.CUSTOM_OPENAI && !isLocalQwen) {
             settingsRepository.getCustomOpenAiEndpoint().first()
@@ -221,6 +217,9 @@ class GeminiInferenceRepository(
         }
 
         val finalResponse = accumulatedText.toString()
+            .trim()
+            .replace(Regex("^(?i:null\\s*)+"), "")
+            .trim()
         val actionExecutor = com.example.jarvisai.data.action.ActionExecutor(context, memoryRepository)
         val actionParser = com.example.jarvisai.data.action.ActionParser()
         actionParser.extractAndExecute(finalResponse, actionExecutor) { resultMsg ->
