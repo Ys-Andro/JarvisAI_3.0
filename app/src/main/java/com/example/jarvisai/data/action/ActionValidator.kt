@@ -33,6 +33,22 @@ class ActionValidator {
                     return Result.failure(IllegalArgumentException("Hora de alarma inválida: $hour"))
                 }
             }
+            "SCHEDULE_ACTION" -> {
+                val actionJson = params["actionJson"]?.toString().orEmpty()
+                val delaySeconds = params["delaySeconds"]?.toString()?.toLongOrNull() ?: -1L
+                val triggerAt = params["triggerAt"]?.toString()?.toLongOrNull() ?: -1L
+                if (actionJson.isBlank() || (delaySeconds <= 0L && triggerAt <= System.currentTimeMillis())) {
+                    return Result.failure(IllegalArgumentException("SCHEDULE_ACTION requiere actionJson y un triggerAt futuro o delaySeconds positivo."))
+                }
+                if (actionJson.length > 12000) {
+                    return Result.failure(IllegalArgumentException("La acción programada excede el límite permitido."))
+                }
+            }
+            "CANCEL_AUTOMATION" -> {
+                if (params["id"]?.toString().isNullOrBlank()) {
+                    return Result.failure(IllegalArgumentException("Falta el ID de la automatización."))
+                }
+            }
         }
 
         val requiresConfirmation = ActionRegistry.isSensitive(upperName)
