@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.jarvisai.data.security.SecureSecretStore
 import com.example.jarvisai.domain.model.AppThemeMode
 import com.example.jarvisai.domain.model.GenerationSettings
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,10 @@ val Context.jarvisDataStore: DataStore<Preferences> by preferencesDataStore(name
 class AppPreferences(private val context: Context) {
 
     private val dataStore: DataStore<Preferences> = context.jarvisDataStore
+
+    private fun secret(value: String?): String? = SecureSecretStore.decrypt(value)
+
+    private fun protectedValue(value: String): String = SecureSecretStore.encrypt(value.trim())
 
     private object Keys {
         val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
@@ -57,18 +62,18 @@ class AppPreferences(private val context: Context) {
         }
 
     val apiKey: Flow<String?> = safePreferences.map { preferences ->
-        preferences[Keys.GEMINI_API_KEY]
+        secret(preferences[Keys.GEMINI_API_KEY])
     }
 
     fun getProviderApiKey(providerId: String): Flow<String?> = safePreferences.map { preferences ->
         when (providerId.lowercase()) {
             "gemini" -> preferences[Keys.GEMINI_API_KEY]
-            "openrouter" -> preferences[Keys.OPENROUTER_API_KEY]
-            "openai" -> preferences[Keys.OPENAI_API_KEY]
-            "deepseek" -> preferences[Keys.DEEPSEEK_API_KEY]
-            "groq" -> preferences[Keys.GROQ_API_KEY]
-            "anthropic" -> preferences[Keys.ANTHROPIC_API_KEY]
-            "custom" -> preferences[Keys.CUSTOM_API_KEY]
+            "openrouter" -> secret(preferences[Keys.OPENROUTER_API_KEY])
+            "openai" -> secret(preferences[Keys.OPENAI_API_KEY])
+            "deepseek" -> secret(preferences[Keys.DEEPSEEK_API_KEY])
+            "groq" -> secret(preferences[Keys.GROQ_API_KEY])
+            "anthropic" -> secret(preferences[Keys.ANTHROPIC_API_KEY])
+            "custom" -> secret(preferences[Keys.CUSTOM_API_KEY])
             else -> preferences[Keys.GEMINI_API_KEY]
         }
     }
@@ -172,7 +177,7 @@ class AppPreferences(private val context: Context) {
             if (apiKey.isBlank()) {
                 preferences.remove(Keys.GEMINI_API_KEY)
             } else {
-                preferences[Keys.GEMINI_API_KEY] = apiKey.trim()
+                preferences[Keys.GEMINI_API_KEY] = protectedValue(apiKey)
             }
         }
     }
@@ -192,7 +197,7 @@ class AppPreferences(private val context: Context) {
             if (apiKey.isBlank()) {
                 preferences.remove(key)
             } else {
-                preferences[key] = apiKey.trim()
+                preferences[key] = protectedValue(apiKey)
             }
         }
     }
