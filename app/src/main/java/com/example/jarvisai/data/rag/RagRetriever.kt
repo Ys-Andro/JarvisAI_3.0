@@ -73,7 +73,7 @@ class RagRetriever(
     }
 
     private fun tokenize(value: String): List<String> =
-        value.split(Regex("[^\p{L}\p{Nd}]+"))
+        value.split(Regex("[^\\p{L}\\p{Nd}]+"))
             .filter { it.length >= 3 }
             .distinct()
             .take(48)
