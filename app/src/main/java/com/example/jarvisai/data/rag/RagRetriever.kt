@@ -40,11 +40,6 @@ class RagRetriever(
                 if (title.contains(phrase)) score += 2.0
             }
 
-            // Small preference for newer material when relevance is comparable.
-            val ageDays = ((System.currentTimeMillis() - chunk.documentId.hashCode().toLong().absoluteValue) / 86_400_000L)
-                .coerceAtLeast(0L)
-            score += 1.0 / ln((ageDays + 2).toDouble())
-
             chunk.copy(score = score.toFloat())
         }.sortedByDescending { it.score }
 
@@ -97,6 +92,4 @@ class RagRetriever(
         }
     }
 
-    private val Long.absoluteValue: Long
-        get() = if (this == Long.MIN_VALUE) Long.MAX_VALUE else kotlin.math.abs(this)
 }
