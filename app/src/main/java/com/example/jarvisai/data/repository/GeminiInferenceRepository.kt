@@ -100,9 +100,9 @@ class GeminiInferenceRepository(
     ): Flow<String> = flow {
         val selectedModelId = settingsRepository.getSelectedGeminiModel().first()
         val modelDef = CloudAiModel.findById(selectedModelId)
-        val isLocalLlama = modelDef.id == "local-llama-termux"
+        val isLocalQwen = modelDef.id == "local-qwen-hf"
 
-        if (!isLocalLlama && !networkMonitor.isCurrentlyOnline) {
+        if (!isLocalQwen && !networkMonitor.isCurrentlyOnline) {
             val noConnectionMsg = "No hay conexión a internet. Revisa tu conexión Wi-Fi o datos móviles para conversar con el asistente."
             _inferenceState.value = InferenceState.Error(noConnectionMsg)
             emit(noConnectionMsg)
@@ -110,7 +110,7 @@ class GeminiInferenceRepository(
         }
 
         val apiKey = resolveApiKeyForProvider(modelDef.provider)
-        if (!isLocalLlama && apiKey.isBlank()) {
+        if (!isLocalQwen && apiKey.isBlank()) {
             val errorMsg = "Por favor ingresa tu API Key para ${modelDef.provider.displayName} en Ajustes."
             _inferenceState.value = InferenceState.Error(errorMsg)
             emit("⚠️ $errorMsg\n\nPuedes ingresar tu API Key en Ajustes o seleccionar Google Gemini en la barra superior.")
@@ -186,7 +186,7 @@ class GeminiInferenceRepository(
 
         val effectiveSettings = settings.copy(systemPrompt = combinedSystemPrompt)
 
-        val customBaseUrl = if (modelDef.provider == ModelProvider.CUSTOM_OPENAI && !isLocalLlama) {
+        val customBaseUrl = if (modelDef.provider == ModelProvider.CUSTOM_OPENAI && !isLocalQwen) {
             settingsRepository.getCustomOpenAiEndpoint().first()
         } else null
 
