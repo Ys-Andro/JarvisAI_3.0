@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.example.jarvisai.di.AppContainer
+import com.example.jarvisai.data.automation.AutomationBootstrap
 import com.example.jarvisai.presentation.JarvisViewModelFactory
 import com.example.jarvisai.presentation.chat.ChatViewModel
 import com.example.jarvisai.presentation.library.LibraryViewModel
@@ -41,6 +42,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleAssistIntent(intent)
+        AutomationBootstrap.restore(this, appContainer.automationDao, appContainer.automationScheduler)
 
         setContent {
             val modelsUiState by modelsViewModel.uiState.collectAsState()
