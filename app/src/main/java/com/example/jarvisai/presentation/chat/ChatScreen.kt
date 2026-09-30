@@ -515,7 +515,13 @@ fun ChatScreen(
             com.example.jarvisai.presentation.chat.components.JarvisLiveModeDialog(
                 liveEngine = viewModel.liveVoiceEngine,
                 settings = uiState.settings,
-                onDismiss = { showLiveMode = false }
+                onCaptureFrameProvider = { provider ->
+                    viewModel.liveVisionFrameProvider = provider
+                },
+                onDismiss = {
+                    viewModel.liveVisionFrameProvider = null
+                    showLiveMode = false
+                }
             )
         }
     }

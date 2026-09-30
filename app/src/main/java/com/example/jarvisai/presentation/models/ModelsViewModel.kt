@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
 class ModelsViewModel(
     private val settingsRepository: ISettingsRepository,
     private val ttsRepository: ITtsRepository,
-    private val context: Context
+    private val context: Context,
+    private val backupManager: com.example.jarvisai.data.backup.JarvisBackupManager? = null
 ) : ViewModel() {
 
     companion object {
@@ -27,6 +28,61 @@ class ModelsViewModel(
 
     private val _uiState = MutableStateFlow(ModelsUiState())
     val uiState: StateFlow<ModelsUiState> = _uiState.asStateFlow()
+
+    val isHotwordEnabled = MutableStateFlow(com.example.jarvisai.data.service.JarvisHotwordService.isServiceRunning)
+    val isMorningBriefingEnabled = MutableStateFlow(false)
+
+    fun toggleHotword(enable: Boolean) {
+        if (enable) {
+            com.example.jarvisai.data.service.JarvisHotwordService.start(context)
+            isHotwordEnabled.value = true
+            _uiState.update { it.copy(statusMessage = "Detección de 'Oye Jarvis' activada en segundo plano.") }
+        } else {
+            com.example.jarvisai.data.service.JarvisHotwordService.stop(context)
+            isHotwordEnabled.value = false
+            _uiState.update { it.copy(statusMessage = "Detección de 'Oye Jarvis' desactivada.") }
+        }
+    }
+
+    fun toggleMorningBriefing(enable: Boolean) {
+        isMorningBriefingEnabled.value = enable
+        com.example.jarvisai.data.worker.JarvisMorningBriefingWorker.scheduleDailyBriefing(context, enable)
+        _uiState.update { 
+            it.copy(statusMessage = if (enable) "Resumen matutino diario activado para las 8:00 AM." else "Resumen matutino diario desactivado.")
+        }
+    }
+
+    fun exportBackup(onResult: (com.example.jarvisai.data.backup.BackupExportResult?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val res = backupManager?.createBackupJson()
+                _uiState.update { it.copy(statusMessage = "Copia generada: ${res?.conversationCount} conversaciones y ${res?.memoryCount} recuerdos.") }
+                onResult(res)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al exportar: ${e.message}") }
+                onResult(null)
+            }
+        }
+    }
+
+    fun restoreBackup(uri: android.net.Uri, onResult: (com.example.jarvisai.data.backup.BackupImportResult) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val res = backupManager?.restoreBackupFromUri(uri)
+                    ?: com.example.jarvisai.data.backup.BackupImportResult(false, 0, 0, 0, "No se encontró el administrador de respaldo")
+                if (res.success) {
+                    _uiState.update { it.copy(statusMessage = "Restauradas ${res.importedConversations} conversaciones y ${res.importedMemories} recuerdos.") }
+                } else {
+                    _uiState.update { it.copy(errorMessage = res.error ?: "Error al restaurar.") }
+                }
+                onResult(res)
+            } catch (e: Exception) {
+                val fail = com.example.jarvisai.data.backup.BackupImportResult(false, 0, 0, 0, e.message)
+                _uiState.update { it.copy(errorMessage = "Fallo al restaurar: ${e.message}") }
+                onResult(fail)
+            }
+        }
+    }
 
     init {
         observeSettings()

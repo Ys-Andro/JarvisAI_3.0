@@ -124,6 +124,32 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse" />
+
+        <service
+            android:name="com.example.jarvisai.data.service.JarvisHotwordService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.example.jarvisai.presentation.widget.JarvisAppWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.jarvisai.ACTION_TOGGLE_BUBBLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/jarvis_app_widget_info" />
+        </receiver>
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

@@ -1,5 +1,10 @@
 package com.example.jarvisai.presentation.settings
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,6 +33,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Hearing
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -113,6 +122,20 @@ fun SettingsScreen(
     var isVoiceExpanded by remember { mutableStateOf(false) }
     var isMemoryExpanded by remember { mutableStateOf(false) }
     var isThemeExpanded by remember { mutableStateOf(false) }
+    var isProactivityExpanded by remember { mutableStateOf(false) }
+    var isBackupExpanded by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val isHotwordActive by viewModel.isHotwordEnabled.collectAsState()
+    val isMorningBriefingActive by viewModel.isMorningBriefingEnabled.collectAsState()
+
+    val backupRestoreLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.restoreBackup(uri) {}
+        }
+    }
 
     Scaffold(
         modifier = modifier
@@ -364,6 +387,209 @@ fun SettingsScreen(
                                 onNavigateToMemory = onNavigateToMemory,
                                 onNavigateToDocuments = onNavigateToDocuments
                             )
+                        }
+                    }
+                }
+
+                // Section: Proactivity & Hotword Wake Word
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.VOICE) {
+                    item {
+                        SettingsSectionCard(
+                            title = "PROACTIVIDAD Y ESCUCHA ACTIVA",
+                            subtitle = "Palabra de activación 'Oye Jarvis' y resumen ejecutivo",
+                            icon = Icons.Default.Hearing,
+                            badgeText = if (isHotwordActive) "ESCUCHA ACTIVA" else "INACTIVO",
+                            badgeColor = if (isHotwordActive) JarvisAccentGreen else JarvisTextSecondary,
+                            isExpanded = isProactivityExpanded,
+                            onToggleExpand = { isProactivityExpanded = !isProactivityExpanded }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Hotword Toggle Row
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(JarvisSurfaceElevated)
+                                        .border(1.dp, JarvisBorder, RoundedCornerShape(10.dp))
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Detección de 'Oye Jarvis'",
+                                            color = JarvisTextPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Permite invocar a Jarvis con la voz en segundo plano",
+                                            color = JarvisTextSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Switch(
+                                        checked = isHotwordActive,
+                                        onCheckedChange = { viewModel.toggleHotword(it) },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = JarvisPrimary,
+                                            checkedTrackColor = JarvisPrimary.copy(alpha = 0.35f)
+                                        )
+                                    )
+                                }
+
+                                // Morning Briefing Toggle Row
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(JarvisSurfaceElevated)
+                                        .border(1.dp, JarvisBorder, RoundedCornerShape(10.dp))
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Resumen Matutino Diario (8:00 AM)",
+                                            color = JarvisTextPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Notificación proactiva con estado de batería y memorias",
+                                            color = JarvisTextSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Switch(
+                                        checked = isMorningBriefingActive,
+                                        onCheckedChange = { viewModel.toggleMorningBriefing(it) },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = JarvisPrimary,
+                                            checkedTrackColor = JarvisPrimary.copy(alpha = 0.35f)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section: Backup & Restore
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.DATA) {
+                    item {
+                        SettingsSectionCard(
+                            title = "COPIA DE SEGURIDAD Y RESTAURACIÓN",
+                            subtitle = "Exporta o restaura tus conversaciones, documentos y recuerdos",
+                            icon = Icons.Default.Backup,
+                            badgeText = "LOCAL / ARCHIVO",
+                            badgeColor = JarvisPrimary,
+                            isExpanded = isBackupExpanded,
+                            onToggleExpand = { isBackupExpanded = !isBackupExpanded }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    text = "Guarda todo el conocimiento, historial de chat y recuerdos aprendidos por Jarvis en un archivo cifrado .jarvis para restaurar en cualquier momento.",
+                                    color = JarvisTextSecondary,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // Export Button
+                                    Surface(
+                                        onClick = {
+                                            viewModel.exportBackup { res ->
+                                                if (res != null) {
+                                                    try {
+                                                        val uri = FileProvider.getUriForFile(
+                                                            context,
+                                                            "${context.packageName}.fileprovider",
+                                                            res.file
+                                                        )
+                                                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                                            type = "application/octet-stream"
+                                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                                            putExtra(Intent.EXTRA_SUBJECT, "Copia de Seguridad Jarvis AI")
+                                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                        }
+                                                        context.startActivity(Intent.createChooser(sendIntent, "Guardar o compartir copia"))
+                                                    } catch (_: Exception) {}
+                                                }
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = JarvisPrimary.copy(alpha = 0.15f),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisPrimary.copy(alpha = 0.6f)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Upload,
+                                                contentDescription = "Exportar",
+                                                tint = JarvisPrimary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Text(
+                                                text = "Exportar (.jarvis)",
+                                                color = JarvisPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+
+                                    // Restore Button
+                                    Surface(
+                                        onClick = {
+                                            backupRestoreLauncher.launch(
+                                                arrayOf(
+                                                    "application/octet-stream",
+                                                    "application/json",
+                                                    "*/*"
+                                                )
+                                            )
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = JarvisSurfaceElevated,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Download,
+                                                contentDescription = "Restaurar",
+                                                tint = JarvisTextPrimary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Text(
+                                                text = "Restaurar",
+                                                color = JarvisTextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

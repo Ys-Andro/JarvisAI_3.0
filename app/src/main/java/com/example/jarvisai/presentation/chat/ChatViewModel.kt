@@ -78,6 +78,8 @@ class ChatViewModel(
         }
     }
 
+    var liveVisionFrameProvider: (() -> String?)? = null
+
     private fun setupLiveVoiceEngine() {
         liveVoiceEngine.setResponseProvider { query ->
             generateDirectAnswer(query)
@@ -116,14 +118,22 @@ class ChatViewModel(
 
             val settings = settingsRepository.getSettings().first()
             val history = _uiState.value.messages
+            val capturedFrame = liveVisionFrameProvider?.invoke()
+            val effectivePrompt = if (capturedFrame != null) {
+                "[MODO LIVE VISION ACTIVO: El usuario te está mostrando la cámara en tiempo real. Analiza visualmente lo que se ve en el feed óptico junto con su pregunta/comentario]\n$query"
+            } else {
+                query
+            }
             val responseBuilder = StringBuilder()
             val startTime = System.currentTimeMillis()
             var tokenCount = 0
 
             inferenceRepository.generateCompletionStream(
-                prompt = query,
+                prompt = effectivePrompt,
                 conversationHistory = history,
-                settings = settings
+                settings = settings,
+                imageBase64 = capturedFrame,
+                imageMimeType = if (capturedFrame != null) "image/jpeg" else null
             ).collect { chunk ->
                 tokenCount++
                 responseBuilder.append(chunk)

@@ -114,4 +114,8 @@ class AppContainer(private val context: Context) {
     val liveVoiceEngine: com.example.jarvisai.domain.voice.ILiveVoiceEngine by lazy {
         com.example.jarvisai.data.voice.AndroidLiveVoiceEngine(context, ttsRepository, settingsRepository)
     }
+
+    val backupManager: com.example.jarvisai.data.backup.JarvisBackupManager by lazy {
+        com.example.jarvisai.data.backup.JarvisBackupManager(context, database, settingsRepository)
+    }
 }

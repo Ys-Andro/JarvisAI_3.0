@@ -5,8 +5,10 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -37,6 +39,8 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -89,11 +93,29 @@ fun JarvisLiveModeDialog(
     liveEngine: ILiveVoiceEngine,
     settings: GenerationSettings,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onCaptureFrameProvider: (((() -> String?)?) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val sessionState by liveEngine.sessionState.collectAsState()
     var isTuningOpen by remember { mutableStateOf(false) }
+    var isLiveVisionActive by remember { mutableStateOf(false) }
+    val liveVisionController = remember { LiveVisionController() }
+
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+        if (isGranted) {
+            isLiveVisionActive = true
+        }
+    }
 
     var hasAudioPermission by remember {
         mutableStateOf(
@@ -118,9 +140,18 @@ fun JarvisLiveModeDialog(
         }
     }
 
+    LaunchedEffect(isLiveVisionActive) {
+        if (isLiveVisionActive) {
+            onCaptureFrameProvider?.invoke { liveVisionController.captureFrameBase64() }
+        } else {
+            onCaptureFrameProvider?.invoke(null)
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             liveEngine.stopListening()
+            onCaptureFrameProvider?.invoke(null)
         }
     }
 
@@ -173,8 +204,30 @@ fun JarvisLiveModeDialog(
                         )
                     }
 
-                    // Top Controls (Voice Tuning & Close)
+                    // Top Controls (Voice Tuning, Live Vision & Close)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Live Vision Toggle Button
+                        IconButton(
+                            onClick = {
+                                if (!hasCameraPermission) {
+                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                } else {
+                                    isLiveVisionActive = !isLiveVisionActive
+                                }
+                            },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(if (isLiveVisionActive) JarvisPrimary.copy(alpha = 0.25f) else JarvisSurface)
+                                .border(1.dp, if (isLiveVisionActive) JarvisPrimary else JarvisBorder, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = if (isLiveVisionActive) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                                contentDescription = "Activar/Desactivar Visión en Vivo",
+                                tint = if (isLiveVisionActive) JarvisPrimary else JarvisTextPrimary
+                            )
+                        }
+
                         IconButton(
                             onClick = { isTuningOpen = !isTuningOpen },
                             modifier = Modifier
@@ -216,6 +269,21 @@ fun JarvisLiveModeDialog(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.weight(1f)
                 ) {
+                    // Live Vision Camera Feed
+                    AnimatedVisibility(
+                        visible = isLiveVisionActive,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        LiveVisionCameraPreview(
+                            controller = liveVisionController,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .padding(bottom = 12.dp)
+                        )
+                    }
+
                     val mascotController = remember { MascotController() }
                     LaunchedEffect(sessionState.phase, sessionState.audioAmplitude, sessionState.isMuted, isSpeaking) {
                         mascotController.updateFromSession(sessionState.phase, sessionState.audioAmplitude, sessionState.isMuted, isSpeaking)
@@ -227,7 +295,7 @@ fun JarvisLiveModeDialog(
                     JarvisMascot(
                         state = mascotState,
                         expression = mascotExpression,
-                        size = 260.dp,
+                        size = if (isLiveVisionActive) 170.dp else 260.dp,
                         audioAmplitude = mascotAmplitude,
                         onClick = {
                             if (isSpeaking) {

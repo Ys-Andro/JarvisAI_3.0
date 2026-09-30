@@ -40,7 +40,8 @@ class JarvisViewModelFactory(
                 ModelsViewModel(
                     settingsRepository = appContainer.settingsRepository,
                     ttsRepository = appContainer.ttsRepository,
-                    context = context
+                    context = context,
+                    backupManager = appContainer.backupManager
                 ) as T
             }
             modelClass.isAssignableFrom(MemoryViewModel::class.java) -> {
