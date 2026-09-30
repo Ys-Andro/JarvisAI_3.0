@@ -80,15 +80,20 @@ fun MessageBubble(
     val clipboardManager = LocalClipboardManager.current
     var isCopied by remember { mutableStateOf(false) }
 
-    val hasAction = !isUser && (message.content.contains("[JARVIS_ACTION:") || message.content.contains("✓ "))
-    val displayContent = if (message.content.contains("[JARVIS_ACTION:")) {
-        message.content.replace(Regex("\\[JARVIS_ACTION:\\s*\\{[\\s\\S]*?\\}\\]"), "").trim()
-    } else {
-        message.content
+    val hasAction = remember(message.content, isUser) {
+        !isUser && (message.content.contains("[JARVIS_ACTION:") || message.content.contains("✓ "))
+    }
+    val displayContent = remember(message.content) {
+        if (message.content.contains("[JARVIS_ACTION:")) {
+            message.content.replace(Regex("\\[JARVIS_ACTION:\\s*\\{[\\s\\S]*?\\}\\]"), "").trim()
+        } else {
+            message.content
+        }
     }
 
-    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val formattedTime = timeFormat.format(Date(message.timestamp))
+    val formattedTime = remember(message.timestamp) {
+        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp))
+    }
 
     LaunchedEffect(isCopied) {
         if (isCopied) {

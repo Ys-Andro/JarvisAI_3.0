@@ -84,7 +84,6 @@ fun SimpleMarkdownText(
         label = "cursor_blink"
     )
 
-    SelectionContainer {
         Column(modifier = modifier) {
             val parts = remember(content) { splitIntoBlocks(content) }
             val lastIndex = parts.lastIndex
@@ -128,7 +127,6 @@ fun SimpleMarkdownText(
             }
         }
     }
-}
 
 @Composable
 private fun EnhancedCodeBlockView(

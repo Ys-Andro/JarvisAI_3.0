@@ -20,6 +20,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import com.example.jarvisai.ui.mascot.JarvisMascot
 import com.example.jarvisai.ui.mascot.MascotController
@@ -63,6 +65,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
@@ -82,10 +85,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -199,10 +206,59 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll to bottom on new message or streaming update
-    LaunchedEffect(uiState.messages.size, uiState.messages.lastOrNull()?.content?.length) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    val coroutineScope = rememberCoroutineScope()
+    var prevMessageCount by remember { mutableIntStateOf(0) }
+    var prevConversationId by remember { mutableStateOf<String?>(null) }
+
+    // Detect if user is currently near the bottom of the chat
+    val isNearBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItems = layoutInfo.visibleItemsInfo
+            if (visibleItems.isEmpty()) true
+            else {
+                val lastVisibleIndex = visibleItems.last().index
+                lastVisibleIndex >= layoutInfo.totalItemsCount - 2
+            }
+        }
+    }
+
+    // Reset and position at bottom when conversation changes
+    LaunchedEffect(uiState.conversation?.id) {
+        val currentConvId = uiState.conversation?.id
+        if (currentConvId != prevConversationId) {
+            prevConversationId = currentConvId
+            prevMessageCount = 0
+            if (uiState.messages.isNotEmpty()) {
+                listState.scrollToItem(uiState.messages.size - 1)
+            }
+        }
+    }
+
+    // Auto-scroll on new messages (sent by user or received)
+    LaunchedEffect(uiState.messages.size) {
+        val currentCount = uiState.messages.size
+        if (currentCount > 0) {
+            if (prevMessageCount == 0) {
+                // Initial load: jump directly to the bottom without animation
+                listState.scrollToItem(currentCount - 1)
+            } else if (currentCount > prevMessageCount) {
+                val lastMsg = uiState.messages.lastOrNull()
+                val isUserMsg = lastMsg?.role == com.example.jarvisai.domain.model.Role.USER
+                // Only scroll if user sent it or user is already at the bottom
+                if (isUserMsg || isNearBottom) {
+                    listState.animateScrollToItem(currentCount - 1)
+                }
+            }
+            prevMessageCount = currentCount
+        }
+    }
+
+    // Keep up with streaming message only if user is already near the bottom
+    // Never interrupts reading if user scrolled up
+    LaunchedEffect(uiState.messages.lastOrNull()?.content?.length) {
+        if (isNearBottom && uiState.messages.isNotEmpty()) {
+            listState.scrollToItem(uiState.messages.size - 1)
         }
     }
 
@@ -408,22 +464,45 @@ fun ChatScreen(
                             items = uiState.messages,
                             key = { it.id }
                         ) { message ->
-                            var visible by remember { mutableStateOf(false) }
-                            LaunchedEffect(message.id) {
-                                visible = true
-                            }
-                            AnimatedVisibility(
-                                visible = visible,
-                                enter = fadeIn(animationSpec = tween(400)) + slideInVertically(
-                                    initialOffsetY = { it / 3 },
-                                    animationSpec = tween(400, easing = FastOutSlowInEasing)
-                                )
-                            ) {
-                                MessageBubble(
-                                    message = message,
-                                    isSpeaking = uiState.isSpeakingTts && message.role != com.example.jarvisai.domain.model.Role.USER,
-                                    onSpeakClick = { viewModel.speakText(it) },
-                                    onStopSpeakClick = { viewModel.stopTts() }
+                            MessageBubble(
+                                message = message,
+                                isSpeaking = uiState.isSpeakingTts && message.role != com.example.jarvisai.domain.model.Role.USER,
+                                onSpeakClick = { viewModel.speakText(it) },
+                                onStopSpeakClick = { viewModel.stopTts() },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                    }
+
+                    // Floating button to quickly jump to the bottom if user scrolled up
+                    AnimatedVisibility(
+                        visible = !isNearBottom && uiState.messages.size > 2,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut(),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 12.dp)
+                    ) {
+                        Surface(
+                            onClick = {
+                                coroutineScope.launch {
+                                    if (uiState.messages.isNotEmpty()) {
+                                        listState.animateScrollToItem(uiState.messages.size - 1)
+                                    }
+                                }
+                            },
+                            shape = CircleShape,
+                            color = JarvisSurfaceElevated,
+                            border = BorderStroke(1.dp, JarvisPrimary.copy(alpha = 0.5f)),
+                            shadowElevation = 6.dp,
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Ir al final del chat",
+                                    tint = JarvisPrimary,
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
