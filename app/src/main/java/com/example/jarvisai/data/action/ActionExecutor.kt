@@ -53,6 +53,13 @@ class ActionExecutor(
                     if (triggerAt <= System.currentTimeMillis() || actionJson.isBlank()) {
                         return ActionExecutionResult.Error("SCHEDULE_ACTION requiere triggerAt futuro o delaySeconds y un actionJson válido.")
                     }
+                    val scheduledAction = try { JSONObject(actionJson).optString("action").uppercase() } catch (_: Exception) { "" }
+                    if (ActionRegistry.isSensitive(scheduledAction)) {
+                        return ActionExecutionResult.RequiresConfirmation(
+                            request,
+                            "La automatización contiene una acción sensible ($scheduledAction) y requiere confirmación explícita."
+                        )
+                    }
                     val id = automationScheduler.schedule(title, triggerAt, actionJson, intervalMinutes)
                     return ActionExecutionResult.Success("Automatización programada: $title (ID $id).")
                 }
@@ -77,7 +84,7 @@ class ActionExecutor(
                         )
                     }
                     val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
-                        .setSmallIcon(com.example.aistudio.jarvisai.anzqdm.R.mipmap.ic_launcher)
+                        .setSmallIcon(com.example.R.mipmap.ic_launcher)
                         .setContentTitle(title)
                         .setContentText(message)
                         .setAutoCancel(true)
