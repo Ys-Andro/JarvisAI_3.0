@@ -3,6 +3,7 @@ package com.example.jarvisai.di
 import android.content.Context
 import com.example.jarvisai.data.api.gemini.GeminiApiClient
 import com.example.jarvisai.data.api.multi.UniversalAiApiClient
+import com.example.jarvisai.data.automation.AutomationScheduler
 import com.example.jarvisai.data.local.database.JarvisDatabase
 import com.example.jarvisai.data.local.database.dao.ConversationDao
 import com.example.jarvisai.data.local.database.dao.DocumentDao
@@ -50,6 +51,14 @@ class AppContainer(private val context: Context) {
         database.documentDao()
     }
 
+    val automationDao: com.example.jarvisai.data.automation.AutomationDao by lazy {
+        database.automationDao()
+    }
+
+    val automationScheduler: AutomationScheduler by lazy {
+        AutomationScheduler(context, automationDao)
+    }
+
     val appPreferences: AppPreferences by lazy {
         AppPreferences(context)
     }
@@ -83,7 +92,7 @@ class AppContainer(private val context: Context) {
     }
 
     val inferenceRepository: IInferenceRepository by lazy {
-        GeminiInferenceRepository(context, geminiApiClient, universalApiClient, settingsRepository, memoryRepository, documentRepository)
+        GeminiInferenceRepository(context, geminiApiClient, universalApiClient, settingsRepository, memoryRepository, documentRepository, conversationRepository)
     }
 
     val androidTtsRepository: AndroidTtsRepository by lazy {
