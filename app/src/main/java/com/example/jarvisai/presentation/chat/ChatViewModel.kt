@@ -182,7 +182,7 @@ class ChatViewModel(
         generalApiKey: String?
     ): Boolean {
         val selectedModelId = _uiState.value.selectedModelId
-        if (selectedModelId == "local-llama-termux") {
+        if (selectedModelId == "local-qwen-hf") {
             return true
         }
         if (provider == ModelProvider.GEMINI) {
@@ -206,7 +206,7 @@ class ChatViewModel(
             val modelDef = CloudAiModel.findById(modelId)
             val providerKeys = _uiState.value.providerApiKeys
             val genKey = settingsRepository.getApiKey().first()
-            val isReady = if (modelId == "local-llama-termux") true else isProviderConfigured(modelDef.provider, providerKeys, genKey)
+            val isReady = if (modelId == "local-qwen-hf") true else isProviderConfigured(modelDef.provider, providerKeys, genKey)
             _uiState.update {
                 it.copy(
                     selectedModelId = modelId,
