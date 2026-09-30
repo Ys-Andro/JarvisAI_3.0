@@ -67,14 +67,14 @@ class AppPreferences(private val context: Context) {
 
     fun getProviderApiKey(providerId: String): Flow<String?> = safePreferences.map { preferences ->
         when (providerId.lowercase()) {
-            "gemini" -> preferences[Keys.GEMINI_API_KEY]
+            "gemini" -> secret(preferences[Keys.GEMINI_API_KEY])
             "openrouter" -> secret(preferences[Keys.OPENROUTER_API_KEY])
             "openai" -> secret(preferences[Keys.OPENAI_API_KEY])
             "deepseek" -> secret(preferences[Keys.DEEPSEEK_API_KEY])
             "groq" -> secret(preferences[Keys.GROQ_API_KEY])
             "anthropic" -> secret(preferences[Keys.ANTHROPIC_API_KEY])
             "custom" -> secret(preferences[Keys.CUSTOM_API_KEY])
-            else -> preferences[Keys.GEMINI_API_KEY]
+            else -> secret(preferences[Keys.GEMINI_API_KEY])
         }
     }
 
@@ -84,13 +84,13 @@ class AppPreferences(private val context: Context) {
 
     val allProviderApiKeys: Flow<Map<String, String>> = safePreferences.map { preferences ->
         buildMap {
-            preferences[Keys.GEMINI_API_KEY]?.let { put("gemini", it) }
-            preferences[Keys.OPENROUTER_API_KEY]?.let { put("openrouter", it) }
-            preferences[Keys.OPENAI_API_KEY]?.let { put("openai", it) }
-            preferences[Keys.DEEPSEEK_API_KEY]?.let { put("deepseek", it) }
-            preferences[Keys.GROQ_API_KEY]?.let { put("groq", it) }
-            preferences[Keys.ANTHROPIC_API_KEY]?.let { put("anthropic", it) }
-            preferences[Keys.CUSTOM_API_KEY]?.let { put("custom", it) }
+            secret(preferences[Keys.GEMINI_API_KEY])?.let { put("gemini", it) }
+            secret(preferences[Keys.OPENROUTER_API_KEY])?.let { put("openrouter", it) }
+            secret(preferences[Keys.OPENAI_API_KEY])?.let { put("openai", it) }
+            secret(preferences[Keys.DEEPSEEK_API_KEY])?.let { put("deepseek", it) }
+            secret(preferences[Keys.GROQ_API_KEY])?.let { put("groq", it) }
+            secret(preferences[Keys.ANTHROPIC_API_KEY])?.let { put("anthropic", it) }
+            secret(preferences[Keys.CUSTOM_API_KEY])?.let { put("custom", it) }
         }
     }
 
