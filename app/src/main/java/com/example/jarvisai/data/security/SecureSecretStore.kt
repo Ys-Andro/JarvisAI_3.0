@@ -49,8 +49,8 @@ object SecureSecretStore {
             cipher.iv.copyInto(payload, 0)
             encrypted.copyInto(payload, cipher.iv.size)
             PREFIX + Base64.encodeToString(payload, Base64.NO_WRAP)
-        } catch (_: Throwable) {
-            value
+        } catch (e: Throwable) {
+            throw IllegalStateException("No se pudo proteger la credencial con Android Keystore.", e)
         }
     }
 
