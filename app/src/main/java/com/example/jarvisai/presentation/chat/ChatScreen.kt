@@ -27,6 +27,8 @@ import com.example.jarvisai.ui.mascot.JarvisMascot
 import com.example.jarvisai.ui.mascot.MascotController
 import com.example.jarvisai.ui.mascot.MascotExpression
 import com.example.jarvisai.ui.mascot.MascotState
+import com.example.jarvisai.ui.mascot.MascotHolographicStage
+import com.example.jarvisai.ui.mascot.JarvisMascotHudSheet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,6 +62,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BubbleChart
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FlashlightOn
@@ -140,6 +143,7 @@ fun ChatScreen(
     onNavigateToDocuments: () -> Unit = {},
     onNavigateToDeviceControl: () -> Unit = {},
     onNavigateToMemory: () -> Unit = {},
+    onNavigateToSharedTodo: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -148,6 +152,7 @@ fun ChatScreen(
     val context = LocalContext.current
 
     var showLiveMode by remember { mutableStateOf(false) }
+    var showMascotHud by remember { mutableStateOf(false) }
 
     // Speech-To-Text launcher
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
@@ -310,9 +315,11 @@ fun ChatScreen(
                     onDocumentsClick = onNavigateToDocuments,
                     onDeviceControlClick = onNavigateToDeviceControl,
                     onMemoryClick = onNavigateToMemory,
+                    onSharedTodoClick = onNavigateToSharedTodo,
                     onModelsClick = onNavigateToModels,
                     onHistoryClick = onNavigateToHistory,
                     onLiveModeClick = { showLiveMode = true },
+                    onMascotClick = { showMascotHud = true },
                     onAgentPlannerClick = onNavigateToAgentPlanner
                 )
             },
@@ -452,7 +459,8 @@ fun ChatScreen(
                         onOpenDeviceControl = onNavigateToDeviceControl,
                         onOpenAgentPlanner = onNavigateToAgentPlanner,
                         onOpenMemory = onNavigateToMemory,
-                        onOpenHistory = onNavigateToHistory
+                        onOpenHistory = onNavigateToHistory,
+                        onQuickActionClick = viewModel::onQuickActionClick
                     )
                 } else {
                     LazyColumn(
@@ -524,6 +532,20 @@ fun ChatScreen(
                 }
             )
         }
+
+        if (showMascotHud) {
+            JarvisMascotHudSheet(
+                onDismissRequest = { showMascotHud = false },
+                onLaunchLiveMode = {
+                    showMascotHud = false
+                    showLiveMode = true
+                },
+                onNavigateToDeviceControl = {
+                    showMascotHud = false
+                    onNavigateToDeviceControl()
+                }
+            )
+        }
     }
 }
 
@@ -540,9 +562,11 @@ private fun ChatTopBar(
     onDocumentsClick: () -> Unit = {},
     onDeviceControlClick: () -> Unit = {},
     onMemoryClick: () -> Unit = {},
+    onSharedTodoClick: () -> Unit = {},
     onModelsClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onLiveModeClick: () -> Unit,
+    onMascotClick: () -> Unit = {},
     onAgentPlannerClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -589,72 +613,95 @@ private fun ChatTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Futuristic High-Tech Model Selector Pill (Weighted to prevent overflow)
-            Surface(
-                onClick = { isModelSheetOpen = true },
-                shape = RoundedCornerShape(20.dp),
-                color = JarvisSurface,
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (isModelLoaded) JarvisBorderGlow else JarvisAccentOrange.copy(alpha = 0.6f)
-                ),
-                modifier = Modifier.weight(1f, fill = false)
+            // Futuristic High-Tech Model Selector: Tres _ uno sobre otro (3 horizontal lines)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { isModelSheetOpen = true }
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                Surface(
+                    onClick = { isModelSheetOpen = true },
+                    shape = RoundedCornerShape(10.dp),
+                    color = JarvisSurface,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isModelLoaded) JarvisBorderGlow else JarvisAccentOrange.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier.size(38.dp)
                 ) {
-                    // Pulsing LED indicator
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentOrange)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        // Tres _ uno sobre otro (3 stacked horizontal lines)
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(3.5.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(18.dp)
+                                    .height(2.5.dp)
+                                    .clip(RoundedCornerShape(1.dp))
+                                    .background(JarvisPrimary)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .width(18.dp)
+                                    .height(2.5.dp)
+                                    .clip(RoundedCornerShape(1.dp))
+                                    .background(JarvisPrimary)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .width(18.dp)
+                                    .height(2.5.dp)
+                                    .clip(RoundedCornerShape(1.dp))
+                                    .background(JarvisPrimary)
+                            )
+                        }
+                    }
+                }
 
-                    // Mini Provider Tag
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = brandColor.copy(alpha = 0.15f)
+                // Active Model Label & Provider Tag
+                Column(
+                    modifier = Modifier.padding(end = 4.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentOrange)
+                        )
                         Text(
-                            text = when (currentModel.provider) {
-                                com.example.jarvisai.domain.model.ModelProvider.GEMINI -> "GEMINI"
-                                com.example.jarvisai.domain.model.ModelProvider.OPENAI -> "OPENAI"
-                                com.example.jarvisai.domain.model.ModelProvider.GROQ -> "GROQ"
-                                com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> "DEEPSEEK"
-                                com.example.jarvisai.domain.model.ModelProvider.ANTHROPIC -> "CLAUDE"
-                                com.example.jarvisai.domain.model.ModelProvider.OPENROUTER -> "ROUTER"
-                                else -> "AI"
-                            },
-                            color = brandColor,
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = currentModel.name,
+                            color = JarvisTextPrimary,
+                            fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-
-                    // Model Name with Ellipsis
                     Text(
-                        text = currentModel.name,
-                        color = JarvisTextPrimary,
-                        fontSize = 11.5.sp,
+                        text = when (currentModel.provider) {
+                            com.example.jarvisai.domain.model.ModelProvider.GEMINI -> "GEMINI AI"
+                            com.example.jarvisai.domain.model.ModelProvider.OPENAI -> "OPENAI"
+                            com.example.jarvisai.domain.model.ModelProvider.GROQ -> "GROQ ULTRA-FAST"
+                            com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> "DEEPSEEK REASONER"
+                            com.example.jarvisai.domain.model.ModelProvider.ANTHROPIC -> "CLAUDE"
+                            com.example.jarvisai.domain.model.ModelProvider.OPENROUTER -> "OPENROUTER"
+                            else -> "CUSTOM ENGINE"
+                        },
+                        color = brandColor,
+                        fontSize = 8.5.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Abrir selector de modelos",
-                        tint = JarvisPrimary,
-                        modifier = Modifier
-                            .size(17.dp)
-                            .rotate(arrowRotation)
+                        letterSpacing = 0.5.sp
                     )
                 }
             }
@@ -786,33 +833,6 @@ private fun ChatTopBar(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Description,
-                                        contentDescription = null,
-                                        tint = Color(0xFF64B5F6),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "SEGUNDO CEREBRO (DOCS)",
-                                        color = Color(0xFF64B5F6),
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            },
-                            onClick = {
-                                isMenuExpanded = false
-                                onDocumentsClick()
-                            }
-                        )
-
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
                                         imageVector = Icons.Default.Smartphone,
                                         contentDescription = null,
                                         tint = JarvisAccentGreen,
@@ -840,13 +860,13 @@ private fun ChatTopBar(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Memory,
+                                        imageVector = Icons.Default.Checklist,
                                         contentDescription = null,
                                         tint = JarvisAccentCyan,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
-                                        text = "MEMORIA PERSISTENTE",
+                                        text = "LISTAS COMPARTIDAS",
                                         color = JarvisAccentCyan,
                                         fontSize = 12.sp,
                                         fontFamily = FontFamily.Monospace,
@@ -856,7 +876,7 @@ private fun ChatTopBar(
                             },
                             onClick = {
                                 isMenuExpanded = false
-                                onMemoryClick()
+                                onSharedTodoClick()
                             }
                         )
 
@@ -921,40 +941,13 @@ private fun ChatTopBar(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Memory,
-                                        contentDescription = null,
-                                        tint = JarvisAccentCyan,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "PLANIFICADOR AGÉNTICO",
-                                        color = JarvisAccentCyan,
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            },
-                            onClick = {
-                                isMenuExpanded = false
-                                onAgentPlannerClick()
-                            }
-                        )
-
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
                                         imageVector = Icons.Default.Settings,
                                         contentDescription = null,
                                         tint = JarvisPrimary,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
-                                        text = "MODELOS / API KEYS",
+                                        text = "CONFIGURACIÓN",
                                         color = JarvisPrimary,
                                         fontSize = 12.sp,
                                         fontFamily = FontFamily.Monospace,
@@ -1062,6 +1055,7 @@ private fun EmptyChatPlaceholder(
     onOpenAgentPlanner: () -> Unit,
     onOpenMemory: () -> Unit,
     onOpenHistory: () -> Unit,
+    onQuickActionClick: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "orb_pulse")
@@ -1083,77 +1077,16 @@ private fun EmptyChatPlaceholder(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // JARVIS 3.0 Visual Mascot Protagonist
-        var mascotExpression by remember { mutableStateOf(MascotExpression.SERENO) }
-        var tapCount by remember { mutableStateOf(0) }
-
-        JarvisMascot(
-            state = if (!isModelLoaded) MascotState.IDLE else MascotState.IDLE,
-            expression = mascotExpression,
-            size = 175.dp,
-            onClick = {
-                tapCount++
-                mascotExpression = when (tapCount % 5) {
-                    0 -> MascotExpression.SERENO
-                    1 -> MascotExpression.FELIZ
-                    2 -> MascotExpression.CURIOSO
-                    3 -> MascotExpression.EMOCIONADO
-                    else -> MascotExpression.ASOMBRADO
-                }
-            }
+        // Central Mascot Protagonist with Holographic Arc Reactor Stage
+        MascotHolographicStage(
+            mascotSize = 190.dp,
+            state = MascotState.IDLE,
+            onLiveModeClick = onOpenLiveMode,
+            onDeviceControlClick = onOpenDeviceControl,
+            onQuickPromptClick = onQuickActionClick
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // System Title & Status Pill
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFF08121E))
-                .border(1.dp, JarvisBorderGlow, RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(if (isModelLoaded) JarvisAccentGreen else JarvisAccentRed)
-            )
-            Text(
-                text = if (isModelLoaded) "CONECTADO // ${modelName ?: "LISTO"}" else "CONFIGURACIÓN PENDIENTE",
-                color = if (isModelLoaded) JarvisAccentGreen else Color(0xFFFF8A80),
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            text = "ASISTENTE JARVIS",
-            color = JarvisTextPrimary,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.5.sp
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = "¿En qué puedo ayudarte hoy? Escribe un mensaje, dicta con voz, usa los comandos rápidos o explora las funciones integradas.",
-            color = JarvisTextSecondary,
-            fontSize = 12.sp,
-            textAlign = TextAlign.Center,
-            lineHeight = 17.sp,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Comprehensive Tactical Capabilities Grid (3 rows x 2 columns)
         Column(

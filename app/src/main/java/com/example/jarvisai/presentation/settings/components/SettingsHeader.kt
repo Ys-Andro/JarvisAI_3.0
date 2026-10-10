@@ -1,5 +1,9 @@
 package com.example.jarvisai.presentation.settings.components
 
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -8,6 +12,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +26,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VolumeUp
@@ -31,35 +35,50 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jarvisai.presentation.models.ModelsUiState
+import com.example.jarvisai.ui.mascot.JarvisMascot
+import com.example.jarvisai.ui.mascot.MascotExpression
+import com.example.jarvisai.ui.mascot.MascotState
+import com.example.jarvisai.ui.theme.JarvisAccentCyan
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
 import com.example.jarvisai.ui.theme.JarvisBorder
+import com.example.jarvisai.ui.theme.JarvisBorderGlow
 import com.example.jarvisai.ui.theme.JarvisPrimary
 import com.example.jarvisai.ui.theme.JarvisPrimaryLight
 import com.example.jarvisai.ui.theme.JarvisSurface
 import com.example.jarvisai.ui.theme.JarvisSurfaceElevated
+import com.example.jarvisai.ui.theme.JarvisSurfaceVariant
 import com.example.jarvisai.ui.theme.JarvisTextPrimary
 import com.example.jarvisai.ui.theme.JarvisTextSecondary
+import com.example.jarvisai.ui.theme.JarvisTextTertiary
 
 @Composable
 fun SettingsHeader(
     uiState: ModelsUiState,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var mascotExpression by remember { mutableStateOf(MascotExpression.FELIZ) }
+    var expressionCounter by remember { mutableStateOf(0) }
+
     val infiniteTransition = rememberInfiniteTransition(label = "hud_pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.85f,
+        initialValue = 0.35f,
+        targetValue = 0.95f,
         animationSpec = infiniteRepeatable(
             animation = tween(1800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -67,7 +86,19 @@ fun SettingsHeader(
         label = "pulse_alpha"
     )
 
-    // Count active providers
+    fun triggerHaptic() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = context.getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(25, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                val v = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? Vibrator
+                v?.vibrate(25)
+            }
+        } catch (_: Exception) {}
+    }
+
     val activeKeysCount = uiState.providerApiKeys.count { it.value.isNotBlank() } +
             (if (!uiState.apiKey.isNullOrBlank()) 1 else 0)
 
@@ -77,12 +108,13 @@ fun SettingsHeader(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
                         JarvisSurfaceElevated,
-                        JarvisSurface
+                        JarvisSurface,
+                        Color(0xFF050810)
                     )
                 )
             )
@@ -91,100 +123,141 @@ fun SettingsHeader(
                 brush = Brush.horizontalGradient(
                     colors = listOf(
                         JarvisPrimary.copy(alpha = pulseAlpha),
-                        JarvisBorder,
-                        JarvisPrimary.copy(alpha = 0.2f)
+                        JarvisBorderGlow,
+                        JarvisPrimaryLight.copy(alpha = 0.3f)
                     )
                 ),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(18.dp)
             )
-            .padding(12.dp)
+            .padding(14.dp)
     ) {
         Column {
-            // Top HUD row
+            // Top Core Banner with Living Mascot Protagonist
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Arc reactor glowing status indicator
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(JarvisAccentGreen.copy(alpha = pulseAlpha))
-                            .border(1.dp, JarvisAccentGreen, CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "JARVIS CORE ONLINE",
-                        color = JarvisAccentGreen,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.8.sp
+                // Living Mascot Hologram Emitting Stage
+                Box(
+                    modifier = Modifier
+                        .size(76.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    JarvisPrimary.copy(alpha = 0.25f * pulseAlpha),
+                                    JarvisSurface
+                                )
+                            )
+                        )
+                        .border(1.dp, JarvisBorderGlow, CircleShape)
+                        .clickable {
+                            triggerHaptic()
+                            expressionCounter++
+                            mascotExpression = when (expressionCounter % 4) {
+                                0 -> MascotExpression.FELIZ
+                                1 -> MascotExpression.CURIOSO
+                                2 -> MascotExpression.EMOCIONADO
+                                else -> MascotExpression.SERENO
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    JarvisMascot(
+                        state = MascotState.IDLE,
+                        expression = mascotExpression,
+                        size = 72.dp
                     )
                 }
 
-                Surface(
-                    color = JarvisPrimary.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(4.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisPrimary.copy(alpha = 0.4f))
-                ) {
+                // Core Diagnostics Column
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(JarvisAccentGreen.copy(alpha = pulseAlpha))
+                                .border(1.dp, JarvisAccentGreen, CircleShape)
+                        )
+                        Text(
+                            text = "NÚCLEO CYBER // JARVIS MK-3.0",
+                            color = JarvisAccentGreen,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(3.dp))
+
                     Text(
-                        text = "v2.5 ARCH",
-                        color = JarvisPrimaryLight,
-                        fontSize = 8.5.sp,
+                        text = "SISTEMAS ONLINE // TOQUE A JARVIS",
+                        color = JarvisTextPrimary,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        text = "Reactores al 100% • Motor neuronal y voz sincronizados",
+                        color = JarvisTextSecondary,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Stat Badges Row
+            // Stat Badges 2x2 Grid
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TelemetryStatCard(
                     icon = Icons.Default.Memory,
-                    label = "MODELO ACTIVO",
-                    value = currentModel.name.take(16),
+                    label = "MODELO IA",
+                    value = currentModel.name.take(15),
                     highlightColor = JarvisPrimary,
                     modifier = Modifier.weight(1f)
                 )
 
                 TelemetryStatCard(
                     icon = Icons.Default.Security,
-                    label = "PERSONALIDAD",
+                    label = "AGENTE",
                     value = "${currentAgent.icon} ${currentAgent.name.take(10)}",
                     highlightColor = JarvisPrimaryLight,
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TelemetryStatCard(
                     icon = Icons.Default.VpnKey,
                     label = "LLAVES API",
-                    value = if (activeKeysCount > 0) "$activeKeysCount Activa(s)" else "Sin llaves",
-                    highlightColor = if (activeKeysCount > 0) JarvisAccentGreen else JarvisTextSecondary,
+                    value = if (activeKeysCount > 0) "$activeKeysCount Activa(s)" else "Local/Gemini",
+                    highlightColor = if (activeKeysCount > 0) JarvisAccentGreen else JarvisAccentCyan,
                     modifier = Modifier.weight(1f)
                 )
 
                 TelemetryStatCard(
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    label = "VOZ AUTO",
-                    value = if (uiState.settings.autoTts) "Habilitada" else "Manual",
-                    highlightColor = if (uiState.settings.autoTts) JarvisAccentGreen else JarvisTextSecondary,
+                    icon = Icons.Default.VolumeUp,
+                    label = "SÍNTESIS VOZ",
+                    value = if (uiState.settings.autoTts) "Automática" else "Manual",
+                    highlightColor = JarvisAccentGreen,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -200,39 +273,41 @@ private fun TelemetryStatCard(
     highlightColor: Color,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(JarvisSurface.copy(alpha = 0.7f))
-            .border(1.dp, JarvisBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = JarvisSurfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder)
     ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = highlightColor,
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = highlightColor,
+                modifier = Modifier.size(15.dp)
+            )
+            Column {
                 Text(
                     text = label,
-                    color = JarvisTextSecondary,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace
+                    color = JarvisTextTertiary,
+                    fontSize = 8.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = value,
+                    color = JarvisTextPrimary,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
                 )
             }
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = value,
-                color = JarvisTextPrimary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1
-            )
         }
     }
 }

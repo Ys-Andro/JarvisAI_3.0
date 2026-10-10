@@ -20,4 +20,8 @@ interface ISettingsRepository {
     suspend fun setAppTheme(theme: AppThemeMode)
     fun getSelectedAgentId(): Flow<String>
     suspend fun setSelectedAgentId(agentId: String)
+    fun getHotwordSensitivity(): Flow<String>
+    suspend fun setHotwordSensitivity(level: String)
+    fun getHotwordAutoLaunchApp(): Flow<Boolean>
+    suspend fun setHotwordAutoLaunchApp(enable: Boolean)
 }

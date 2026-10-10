@@ -62,6 +62,9 @@ fun JarvisNavHost(
                 },
                 onNavigateToMemory = {
                     navController.navigate(Screen.Memory.route)
+                },
+                onNavigateToSharedTodo = {
+                    navController.navigate(Screen.SharedTodo.route)
                 }
             )
         }
@@ -141,6 +144,16 @@ fun JarvisNavHost(
             val agentViewModel: AutonomousAgentPlannerViewModel = viewModel(factory = viewModelFactory)
             AutonomousAgentPlannerScreen(
                 viewModel = agentViewModel,
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.SharedTodo.route) {
+            val todoViewModel: com.example.jarvisai.presentation.todo.SharedTodoViewModel = viewModel(factory = viewModelFactory)
+            com.example.jarvisai.presentation.todo.SharedTodoScreen(
+                viewModel = todoViewModel,
                 onBackClick = {
                     navController.popBackStack()
                 }

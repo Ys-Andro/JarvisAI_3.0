@@ -26,10 +26,18 @@ class JarvisVoiceInteractionSessionService : VoiceInteractionSessionService() {
                     val intent = Intent(context, MainActivity::class.java).apply {
                         action = Intent.ACTION_ASSIST
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("EXTRA_ASSISTANT_INVOCATION", true)
                     }
-                    context.startActivity(intent)
+                    startAssistantActivity(intent)
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    try {
+                        val intent = Intent(context, MainActivity::class.java).apply {
+                            action = Intent.ACTION_ASSIST
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            putExtra("EXTRA_ASSISTANT_INVOCATION", true)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
                 }
                 try {
                     finish()

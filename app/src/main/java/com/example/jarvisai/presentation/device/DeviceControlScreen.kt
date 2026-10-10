@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.BubbleChart
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -99,6 +101,9 @@ fun DeviceControlScreen(
     var isAccessibilityEnabled by remember {
         mutableStateOf(JarvisAccessibilityService.isAccessibilityServiceEnabled(context))
     }
+    var isDefaultAssistant by remember {
+        mutableStateOf(checkDefaultAssistant(context))
+    }
     var isNotificationAccessEnabled by remember {
         mutableStateOf(JarvisNotificationListenerService.isPermissionGranted(context))
     }
@@ -119,6 +124,7 @@ fun DeviceControlScreen(
     LaunchedEffect(Unit) {
         while (true) {
             isAccessibilityEnabled = JarvisAccessibilityService.isAccessibilityServiceEnabled(context)
+            isDefaultAssistant = checkDefaultAssistant(context)
             isNotificationAccessEnabled = JarvisNotificationListenerService.isPermissionGranted(context)
             isOverlayPermissionGranted = DeviceController.canDrawOverlays(context)
             isFloatingBubbleRunning = com.example.jarvisai.data.service.JarvisFloatingBubbleService.isServiceRunning
@@ -167,6 +173,22 @@ fun DeviceControlScreen(
 
             item {
                 ServiceStatusCard(
+                    title = "Asistente Predeterminado",
+                    description = if (isDefaultAssistant) {
+                        "Jarvis está configurado como tu asistente predeterminado. Mantén presionado el botón de inicio o gesto de Android para invocarlo."
+                    } else {
+                        "Selecciona Jarvis como tu asistente digital de Android para invocarlo manteniendo presionado el botón de inicio o encendido."
+                    },
+                    isActive = isDefaultAssistant,
+                    icon = Icons.Default.Mic,
+                    onConfigureClick = {
+                        DeviceController.openDefaultAssistantSettings(context)
+                    }
+                )
+            }
+
+            item {
+                ServiceStatusCard(
                     title = "Servicio de Accesibilidad",
                     description = "Permite a Jarvis ayudarte a interactuar con botones y navegar entre aplicaciones cuando se lo pidas.",
                     isActive = isAccessibilityEnabled,
@@ -175,6 +197,53 @@ fun DeviceControlScreen(
                         DeviceController.openSettings(context, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     }
                 )
+            }
+
+            if (!isAccessibilityEnabled) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = JarvisSurfaceElevated,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentOrange.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = JarvisAccentOrange,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "¿Dice 'Ajuste restringido' en Android 13/14+?",
+                                    color = JarvisAccentOrange,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "En teléfonos modernos, Android bloquea la accesibilidad de apps instaladas como APK. Para desbloquearla:\n1. Toca 'Abrir Ajustes de Jarvis' abajo.\n2. Toca los 3 puntos (⋮) arriba a la derecha y pulsa 'Permitir ajustes restringidos'.\n3. Regresa a Accesibilidad y activa Jarvis.",
+                                color = JarvisTextSecondary,
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = { DeviceController.openAppDetailsSettings(context) },
+                                colors = ButtonDefaults.buttonColors(containerColor = JarvisPrimary.copy(alpha = 0.2f)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Abrir Ajustes de Jarvis (3 puntos)", color = JarvisPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
             }
 
             item {
@@ -1167,5 +1236,16 @@ private fun CommandExampleItem(
                 fontFamily = FontFamily.Monospace
             )
         }
+    }
+}
+
+private fun checkDefaultAssistant(context: Context): Boolean {
+    return try {
+        val assistant = android.provider.Settings.Secure.getString(context.contentResolver, "assistant")
+        val voiceService = android.provider.Settings.Secure.getString(context.contentResolver, "voice_interaction_service")
+        (assistant != null && assistant.contains(context.packageName)) ||
+        (voiceService != null && voiceService.contains(context.packageName))
+    } catch (_: Exception) {
+        false
     }
 }

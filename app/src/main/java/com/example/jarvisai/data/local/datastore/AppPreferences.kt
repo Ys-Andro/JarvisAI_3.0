@@ -50,6 +50,8 @@ class AppPreferences(private val context: Context) {
         val ANDROID_VOICE_NAME = stringPreferencesKey("android_voice_name")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val SELECTED_AGENT_ID = stringPreferencesKey("selected_agent_id")
+        val HOTWORD_SENSITIVITY = stringPreferencesKey("hotword_sensitivity") // "LOW", "MEDIUM", "HIGH"
+        val HOTWORD_AUTO_LAUNCH_APP = booleanPreferencesKey("hotword_auto_launch_app")
     }
 
     private val safePreferences: Flow<Preferences> = dataStore.data
@@ -227,6 +229,26 @@ class AppPreferences(private val context: Context) {
     suspend fun setSelectedAgentId(agentId: String) {
         dataStore.edit { preferences ->
             preferences[Keys.SELECTED_AGENT_ID] = agentId
+        }
+    }
+
+    val hotwordSensitivity: Flow<String> = safePreferences.map { preferences ->
+        preferences[Keys.HOTWORD_SENSITIVITY] ?: "LOW"
+    }
+
+    suspend fun setHotwordSensitivity(level: String) {
+        dataStore.edit { preferences ->
+            preferences[Keys.HOTWORD_SENSITIVITY] = level
+        }
+    }
+
+    val hotwordAutoLaunchApp: Flow<Boolean> = safePreferences.map { preferences ->
+        preferences[Keys.HOTWORD_AUTO_LAUNCH_APP] ?: true
+    }
+
+    suspend fun setHotwordAutoLaunchApp(enable: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[Keys.HOTWORD_AUTO_LAUNCH_APP] = enable
         }
     }
 }

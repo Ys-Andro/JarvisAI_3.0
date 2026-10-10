@@ -1,0 +1,130 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation for User Profile
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 150 &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 1000)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // Validation for TodoList
+    function isValidTodoList(data) {
+      return data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 1000)) &&
+             data.ownerId is string && data.ownerId.size() > 0 &&
+             data.ownerEmail is string && data.ownerEmail.size() > 0 &&
+             data.memberUids is list && data.memberUids.size() >= 1 && data.memberUids.size() <= 50 &&
+             data.memberUids.hasAll([data.ownerId]) &&
+             (!('colorHex' in data) || (data.colorHex is string && data.colorHex.size() <= 16)) &&
+             (!('totalTasks' in data) || data.totalTasks is int) &&
+             (!('completedTasks' in data) || data.completedTasks is int) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // Validation for TodoTask
+    function isValidTodoTask(data) {
+      return data.listId is string && isValidId(data.listId) &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 300 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             data.completed is bool &&
+             data.priority is string && (data.priority == 'LOW' || data.priority == 'MEDIUM' || data.priority == 'HIGH') &&
+             (!('dueDate' in data) || (data.dueDate is string && data.dueDate.size() <= 50)) &&
+             (!('assignedToUid' in data) || (data.assignedToUid is string && data.assignedToUid.size() <= 128)) &&
+             (!('assignedToName' in data) || (data.assignedToName is string && data.assignedToName.size() <= 100)) &&
+             data.createdByUid is string && data.createdByUid.size() > 0 &&
+             (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 100)) &&
+             data.memberUids is list && data.memberUids.size() >= 1 && data.memberUids.size() <= 50 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // /users/{userId}
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'updatedAt']);
+
+      allow delete: if isOwner(userId);
+    }
+
+    // /todo_lists/{listId}
+    match /todo_lists/{listId} {
+      allow get: if isSignedIn() && isValidId(listId) && (request.auth.uid in existing().memberUids);
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.memberUids);
+
+      allow create: if isSignedIn() && isValidId(listId) &&
+                       incoming().ownerId == request.auth.uid &&
+                       (request.auth.uid in incoming().memberUids) &&
+                       isValidTodoList(incoming());
+
+      allow update: if isSignedIn() && isValidId(listId) &&
+                       (request.auth.uid in existing().memberUids) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTodoList(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'memberUids', 'colorHex', 'totalTasks', 'completedTasks', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(listId) &&
+                       existing().ownerId == request.auth.uid;
+
+      // /todo_lists/{listId}/tasks/{taskId}
+      match /tasks/{taskId} {
+        allow get: if isSignedIn() && isValidId(taskId) && (request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (request.auth.uid in resource.data.memberUids);
+
+        allow create: if isSignedIn() && isValidId(taskId) &&
+                         incoming().listId == listId &&
+                         incoming().createdByUid == request.auth.uid &&
+                         (request.auth.uid in incoming().memberUids) &&
+                         isValidTodoTask(incoming());
+
+        allow update: if isSignedIn() && isValidId(taskId) &&
+                         (request.auth.uid in existing().memberUids) &&
+                         incoming().listId == existing().listId &&
+                         incoming().createdByUid == existing().createdByUid &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTodoTask(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'completed', 'priority', 'dueDate', 'assignedToUid', 'assignedToName', 'memberUids', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(taskId) &&
+                         (request.auth.uid in existing().memberUids);
+      }
+    }
+  }
+}

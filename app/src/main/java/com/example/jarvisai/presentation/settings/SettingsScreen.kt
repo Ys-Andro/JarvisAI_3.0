@@ -12,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -134,6 +135,14 @@ fun SettingsScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             viewModel.restoreBackup(uri) {}
+        }
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.toggleHotword(true)
         }
     }
 
@@ -433,12 +442,143 @@ fun SettingsScreen(
                                     }
                                     Switch(
                                         checked = isHotwordActive,
-                                        onCheckedChange = { viewModel.toggleHotword(it) },
+                                        onCheckedChange = { enable ->
+                                            if (enable) {
+                                                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                                                        context,
+                                                        android.Manifest.permission.RECORD_AUDIO
+                                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                                ) {
+                                                    viewModel.toggleHotword(true)
+                                                } else {
+                                                    micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                                }
+                                            } else {
+                                                viewModel.toggleHotword(false)
+                                            }
+                                        },
                                         colors = SwitchDefaults.colors(
                                             checkedThumbColor = JarvisPrimary,
                                             checkedTrackColor = JarvisPrimary.copy(alpha = 0.35f)
                                         )
                                     )
+                                }
+
+                                // Hotword Sensitivity Calibration (Anti-False-Positive Filter)
+                                if (isHotwordActive) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(JarvisSurfaceElevated.copy(alpha = 0.7f))
+                                            .border(1.dp, JarvisBorder.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "Sensibilidad de Activación",
+                                                color = JarvisTextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = when (uiState.hotwordSensitivity.uppercase()) {
+                                                    "LOW" -> "Baja (Antifalsos positivos)"
+                                                    "MEDIUM" -> "Media (Equilibrada)"
+                                                    else -> "Alta (Sensible)"
+                                                },
+                                                color = JarvisPrimary,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        Text(
+                                            text = "Baja: Requiere pronunciar con claridad 'Oye Jarvis' o 'Hola Jarvis'. Evita activaciones accidentales por ruidos o charlas casuales.",
+                                            color = JarvisTextSecondary,
+                                            fontSize = 10.sp,
+                                            lineHeight = 14.sp
+                                        )
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            listOf(
+                                                "LOW" to "Baja (Recomendada)",
+                                                "MEDIUM" to "Media",
+                                                "HIGH" to "Alta"
+                                            ).forEach { (level, label) ->
+                                                val isSelected = uiState.hotwordSensitivity.equals(level, ignoreCase = true)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(
+                                                            if (isSelected) JarvisPrimary.copy(alpha = 0.22f)
+                                                            else JarvisSurface
+                                                        )
+                                                        .border(
+                                                            1.dp,
+                                                            if (isSelected) JarvisPrimary else JarvisBorder,
+                                                            RoundedCornerShape(8.dp)
+                                                        )
+                                                        .clickable { viewModel.setHotwordSensitivity(level) }
+                                                        .padding(vertical = 8.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        color = if (isSelected) JarvisPrimary else JarvisTextSecondary,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Non-intrusive full screen mode toggle
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(JarvisSurfaceElevated.copy(alpha = 0.7f))
+                                            .border(1.dp, JarvisBorder.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Abrir app a pantalla completa al activar",
+                                                color = JarvisTextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = if (uiState.hotwordAutoLaunchApp)
+                                                    "Abre la app principal automáticamente"
+                                                else
+                                                    "Modo discreto: Sólo activa la burbuja/HUD holográfico sin interrumpir otras aplicaciones",
+                                                color = JarvisTextSecondary,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                        Switch(
+                                            checked = uiState.hotwordAutoLaunchApp,
+                                            onCheckedChange = { viewModel.setHotwordAutoLaunchApp(it) },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = JarvisPrimary,
+                                                checkedTrackColor = JarvisPrimary.copy(alpha = 0.35f)
+                                            )
+                                        )
+                                    }
                                 }
 
                                 // Morning Briefing Toggle Row

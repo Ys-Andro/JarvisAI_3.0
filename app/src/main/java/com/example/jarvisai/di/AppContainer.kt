@@ -118,4 +118,12 @@ class AppContainer(private val context: Context) {
     val backupManager: com.example.jarvisai.data.backup.JarvisBackupManager by lazy {
         com.example.jarvisai.data.backup.JarvisBackupManager(context, database, settingsRepository)
     }
+
+    val sharedTodoRepository: com.example.jarvisai.data.repository.SharedTodoRepository by lazy {
+        com.example.jarvisai.data.repository.SharedTodoRepository(context)
+    }
+
+    val googleAuthManager: com.example.jarvisai.data.auth.GoogleAuthManager by lazy {
+        com.example.jarvisai.data.auth.GoogleAuthManager(context)
+    }
 }

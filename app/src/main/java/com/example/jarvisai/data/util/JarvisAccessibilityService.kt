@@ -19,12 +19,34 @@ class JarvisAccessibilityService : AccessibilityService() {
             private set
 
         fun isAccessibilityServiceEnabled(context: Context): Boolean {
-            val enabledServices = Settings.Secure.getString(
-                context.contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            ) ?: return false
-            val expectedComponentName = "${context.packageName}/${JarvisAccessibilityService::class.java.name}"
-            return enabledServices.contains(expectedComponentName) || enabledServices.contains(context.packageName)
+            if (instance != null) return true
+
+            try {
+                val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
+                val enabledServices = am?.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                if (enabledServices != null) {
+                    for (service in enabledServices) {
+                        val serviceInfo = service.resolveInfo?.serviceInfo
+                        if (serviceInfo != null && (serviceInfo.packageName == context.packageName || serviceInfo.name == JarvisAccessibilityService::class.java.name)) {
+                            return true
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            try {
+                val enabledServices = Settings.Secure.getString(
+                    context.contentResolver,
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                ) ?: return false
+                val expectedFull = "${context.packageName}/${JarvisAccessibilityService::class.java.name}"
+                val expectedShort = "${context.packageName}/.${JarvisAccessibilityService::class.java.simpleName}"
+                return enabledServices.contains(expectedFull) ||
+                       enabledServices.contains(expectedShort) ||
+                       enabledServices.contains(context.packageName)
+            } catch (_: Exception) {
+                return false
+            }
         }
     }
 

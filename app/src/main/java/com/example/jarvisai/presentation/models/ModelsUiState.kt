@@ -12,6 +12,8 @@ data class ModelsUiState(
     val isValidatingApiKey: Boolean = false,
     val settings: GenerationSettings = GenerationSettings(),
     val appTheme: AppThemeMode = AppThemeMode.DARK_JARVIS,
+    val hotwordSensitivity: String = "LOW",
+    val hotwordAutoLaunchApp: Boolean = true,
     val statusMessage: String? = null,
     val errorMessage: String? = null
 )

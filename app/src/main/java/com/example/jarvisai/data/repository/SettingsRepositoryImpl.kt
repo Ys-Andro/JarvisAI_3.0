@@ -69,4 +69,20 @@ class SettingsRepositoryImpl(
     override suspend fun setSelectedAgentId(agentId: String) {
         appPreferences.setSelectedAgentId(agentId)
     }
+
+    override fun getHotwordSensitivity(): Flow<String> {
+        return appPreferences.hotwordSensitivity
+    }
+
+    override suspend fun setHotwordSensitivity(level: String) {
+        appPreferences.setHotwordSensitivity(level)
+    }
+
+    override fun getHotwordAutoLaunchApp(): Flow<Boolean> {
+        return appPreferences.hotwordAutoLaunchApp
+    }
+
+    override suspend fun setHotwordAutoLaunchApp(enable: Boolean) {
+        appPreferences.setHotwordAutoLaunchApp(enable)
+    }
 }

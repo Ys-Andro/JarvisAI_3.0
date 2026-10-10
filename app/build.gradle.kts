@@ -3,6 +3,7 @@ plugins {
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
+  alias(libs.plugins.google.services)
 }
 
 android {
@@ -117,6 +118,14 @@ dependencies {
 
   // Image Loading
   implementation(libs.coil.compose)
+
+  // Firebase Firestore, Auth, and Google Sign-In via Credential Manager
+  implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.firestore)
+  implementation(libs.firebase.auth)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services)
+  implementation(libs.googleid)
 
   // Testing
   testImplementation(libs.androidx.compose.ui.test.junit4)

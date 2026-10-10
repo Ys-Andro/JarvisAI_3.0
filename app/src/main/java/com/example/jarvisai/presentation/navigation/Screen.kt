@@ -8,4 +8,5 @@ sealed class Screen(val route: String) {
     object Documents : Screen("documents_screen")
     object DeviceControl : Screen("device_control_screen")
     object AgentPlanner : Screen("agent_planner_screen")
+    object SharedTodo : Screen("shared_todo_screen")
 }

@@ -34,11 +34,23 @@ class ModelsViewModel(
 
     fun toggleHotword(enable: Boolean) {
         if (enable) {
-            com.example.jarvisai.data.service.JarvisHotwordService.start(context)
-            isHotwordEnabled.value = true
-            _uiState.update { it.copy(statusMessage = "Detección de 'Oye Jarvis' activada en segundo plano.") }
+            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                isHotwordEnabled.value = false
+                _uiState.update { it.copy(statusMessage = "Concede primero el permiso de Micrófono para activar la escucha de 'Oye Jarvis'.") }
+                return
+            }
+            try {
+                com.example.jarvisai.data.service.JarvisHotwordService.start(context)
+                isHotwordEnabled.value = true
+                _uiState.update { it.copy(statusMessage = "Detección de 'Oye Jarvis' activada en segundo plano.") }
+            } catch (e: Exception) {
+                isHotwordEnabled.value = false
+                _uiState.update { it.copy(statusMessage = "No se pudo iniciar el servicio de voz: ${e.message}") }
+            }
         } else {
-            com.example.jarvisai.data.service.JarvisHotwordService.stop(context)
+            try {
+                com.example.jarvisai.data.service.JarvisHotwordService.stop(context)
+            } catch (_: Exception) {}
             isHotwordEnabled.value = false
             _uiState.update { it.copy(statusMessage = "Detección de 'Oye Jarvis' desactivada.") }
         }
@@ -91,6 +103,46 @@ class ModelsViewModel(
         observeGeminiModel()
         observeProviderApiKeys()
         observeSelectedAgent()
+        observeHotwordSettings()
+    }
+
+    private fun observeHotwordSettings() {
+        viewModelScope.launch {
+            settingsRepository.getHotwordSensitivity().collect { sensitivity ->
+                _uiState.update { it.copy(hotwordSensitivity = sensitivity) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.getHotwordAutoLaunchApp().collect { autoLaunch ->
+                _uiState.update { it.copy(hotwordAutoLaunchApp = autoLaunch) }
+            }
+        }
+    }
+
+    fun setHotwordSensitivity(level: String) {
+        viewModelScope.launch {
+            settingsRepository.setHotwordSensitivity(level)
+            val desc = when (level) {
+                "LOW" -> "Baja (Muy precisa: requiere 'Oye Jarvis' claro para evitar accidentes)"
+                "MEDIUM" -> "Media (Equilibrada)"
+                else -> "Alta (Sensible)"
+            }
+            _uiState.update { it.copy(statusMessage = "Sensibilidad de activación: $desc") }
+        }
+    }
+
+    fun setHotwordAutoLaunchApp(enable: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setHotwordAutoLaunchApp(enable)
+            _uiState.update { 
+                it.copy(
+                    statusMessage = if (enable) 
+                        "La app se abrirá al decir 'Oye Jarvis'." 
+                    else 
+                        "Modo no intrusivo: sólo activará la burbuja/HUD flotante sin saltar a pantalla completa."
+                ) 
+            }
+        }
     }
 
     private fun observeSelectedAgent() {

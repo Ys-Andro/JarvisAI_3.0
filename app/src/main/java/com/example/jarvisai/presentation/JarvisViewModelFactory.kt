@@ -64,6 +64,12 @@ class JarvisViewModelFactory(
                     documentRepository = appContainer.documentRepository
                 ) as T
             }
+            modelClass.isAssignableFrom(com.example.jarvisai.presentation.todo.SharedTodoViewModel::class.java) -> {
+                com.example.jarvisai.presentation.todo.SharedTodoViewModel(
+                    repository = appContainer.sharedTodoRepository,
+                    authManager = appContainer.googleAuthManager
+                ) as T
+            }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
     }
