@@ -111,6 +111,10 @@ class AppContainer(private val context: Context) {
         AgentOrchestrator(context, conversationRepository, memoryRepository, documentRepository, inferenceRepository, settingsRepository)
     }
 
+    val actionExecutor: com.example.jarvisai.data.action.ActionExecutor by lazy {
+        com.example.jarvisai.data.action.ActionExecutor(context, memoryRepository)
+    }
+
     val liveVoiceEngine: com.example.jarvisai.domain.voice.ILiveVoiceEngine by lazy {
         com.example.jarvisai.data.voice.AndroidLiveVoiceEngine(context, ttsRepository, settingsRepository)
     }

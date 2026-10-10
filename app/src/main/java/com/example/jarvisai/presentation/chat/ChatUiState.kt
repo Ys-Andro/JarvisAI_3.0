@@ -28,6 +28,8 @@ data class ChatUiState(
     val totalDocumentsLearned: Int = 0,
     val totalMemoriesCount: Int = 0,
     val settings: com.example.jarvisai.domain.model.GenerationSettings = com.example.jarvisai.domain.model.GenerationSettings(),
+    val pendingActionConfirmation: com.example.jarvisai.data.action.ActionRequest? = null,
+    val pendingActionJson: String? = null,
     val errorMessage: String? = null
 ) {
     val isGenerating: Boolean get() = inferenceStatus is ChatInferenceStatus.Generating
@@ -35,9 +37,13 @@ data class ChatUiState(
     fun isProviderReady(provider: ModelProvider): Boolean {
         if (provider == ModelProvider.GEMINI) {
             val provKey = providerApiKeys["gemini"]
-            val buildKey = try {
-                com.example.BuildConfig.GEMINI_API_KEY
-            } catch (_: Throwable) {
+            val buildKey = if (com.example.BuildConfig.DEBUG) {
+                try {
+                    com.example.BuildConfig.GEMINI_API_KEY
+                } catch (_: Throwable) {
+                    ""
+                }
+            } else {
                 ""
             }
             return !provKey.isNullOrBlank() || (buildKey.isNotBlank() && buildKey != "DEFAULT_API_KEY")

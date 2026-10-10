@@ -1,6 +1,7 @@
 package com.example.jarvisai.data.api.multi
 
 import android.util.Log
+import com.example.BuildConfig
 import com.example.jarvisai.data.api.gemini.GeminiApiClient
 import com.example.jarvisai.data.api.gemini.GeminiGenerationConfig
 import com.example.jarvisai.data.api.gemini.GeminiMessage
@@ -193,8 +194,16 @@ class UniversalAiApiClient(
             val responseCode = connection.responseCode
             if (responseCode !in 200..299) {
                 val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $responseCode"
-                Log.e(TAG, "OpenAI-compatible error ($responseCode): $errorBody")
-                throw IllegalStateException("API Error ($responseCode): $errorBody")
+                if (BuildConfig.DEBUG) {
+                    Log.e(TAG, "OpenAI-compatible error ($responseCode): $errorBody")
+                }
+                val sanitizedMsg = try {
+                    JSONObject(errorBody).optJSONObject("error")?.optString("message")
+                        ?.takeIf { it.isNotBlank() } ?: "HTTP $responseCode"
+                } catch (_: Exception) {
+                    "HTTP $responseCode"
+                }
+                throw IllegalStateException("API Error ($responseCode): $sanitizedMsg")
             }
 
             reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))
@@ -294,8 +303,16 @@ class UniversalAiApiClient(
             val responseCode = connection.responseCode
             if (responseCode !in 200..299) {
                 val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $responseCode"
-                Log.e(TAG, "Anthropic API error ($responseCode): $errorBody")
-                throw IllegalStateException("Anthropic Error ($responseCode): $errorBody")
+                if (BuildConfig.DEBUG) {
+                    Log.e(TAG, "Anthropic API error ($responseCode): $errorBody")
+                }
+                val sanitizedMsg = try {
+                    JSONObject(errorBody).optJSONObject("error")?.optString("message")
+                        ?.takeIf { it.isNotBlank() } ?: "HTTP $responseCode"
+                } catch (_: Exception) {
+                    "HTTP $responseCode"
+                }
+                throw IllegalStateException("Anthropic Error ($responseCode): $sanitizedMsg")
             }
 
             reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))

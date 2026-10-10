@@ -13,10 +13,22 @@ object ActionRegistry {
         "OPEN_WIFI", "OPEN_BLUETOOTH", "VIBRATE", "SHOW_REMINDER", "SCHEDULE_ACTION", "CANCEL_AUTOMATION", "SAVE_MEMORY", "DELETE_MEMORY"
     )
 
+    val SENSITIVE_ACTIONS = setOf(
+        "CALL",
+        "WHATSAPP_MESSAGE",
+        "TYPE_TEXT",
+        "CLICK_TEXT",
+        "DELETE_MEMORY",
+        "SAVE_MEMORY",
+        "SCREENSHOT",
+        "READ_NOTIFICATIONS",
+        "READ_SCREEN",
+        "OPEN_URL",
+        "SCHEDULE_ACTION",
+        "CANCEL_AUTOMATION"
+    )
+
     fun isSensitive(action: String): Boolean {
-        return when (action.uppercase()) {
-            "CALL", "WHATSAPP_MESSAGE", "DELETE_MEMORY", "SCREENSHOT", "READ_NOTIFICATIONS", "TYPE_TEXT" -> true
-            else -> false
-        }
+        return SENSITIVE_ACTIONS.contains(action.uppercase())
     }
 }

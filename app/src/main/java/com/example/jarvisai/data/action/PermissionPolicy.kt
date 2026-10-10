@@ -1,11 +1,17 @@
 package com.example.jarvisai.data.action
 
 class PermissionPolicy {
-    fun evaluate(request: ActionRequest): ActionExecutionResult {
-        if (request.confirmationRequired) {
-            // For sensitive actions (calls, messages, deleting memory, etc.), policy can require confirmation or check user clearance
-            // For autonomous safety, we flag requires confirmation if needed, or allow execution if pre-approved.
-            // Here we return Success unless strict policy mode is enabled.
+    fun evaluate(request: ActionRequest, hasExternalContent: Boolean = false): ActionExecutionResult {
+        if (request.confirmationRequired || (hasExternalContent && ActionRegistry.isSensitive(request.action))) {
+            val promptMsg = if (hasExternalContent) {
+                "La acción ${request.action} es sensible y requiere confirmación obligatoria al provenir de un turno con contenido externo no confiable."
+            } else {
+                "La acción ${request.action} requiere confirmación del usuario para ejecutarse."
+            }
+            return ActionExecutionResult.RequiresConfirmation(
+                action = request.copy(confirmationRequired = true),
+                prompt = promptMsg
+            )
         }
         return ActionExecutionResult.Success("Permiso concedido")
     }

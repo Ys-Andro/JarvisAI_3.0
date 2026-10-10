@@ -133,8 +133,13 @@ object DeviceController {
                 }
                 "OPEN_URL" -> {
                     val url = json.optString("url", "https://www.google.com")
-                    openUrl(context, url)
-                    "Abriendo $url..."
+                    val lower = url.trim().lowercase()
+                    if (lower.startsWith("intent:") || lower.startsWith("file:") || lower.startsWith("javascript:") || lower.startsWith("content:")) {
+                        "URL rechazada por seguridad: no se permiten esquemas peligrosos."
+                    } else {
+                        openUrl(context, url)
+                        "Abriendo $url..."
+                    }
                 }
 
                 // Read Notifications
@@ -398,6 +403,66 @@ object DeviceController {
         return "No pude encontrar la aplicación '$appName' instalada en este dispositivo, señor."
     }
 
+    fun isAppInstalled(context: Context, appNameOrPackage: String): Boolean {
+        val query = appNameOrPackage.lowercase().trim()
+        if (query.isBlank()) return false
+        val pm = context.packageManager
+
+        // 1. Direct package check
+        try {
+            if (pm.getLaunchIntentForPackage(appNameOrPackage.trim()) != null) return true
+            pm.getPackageInfo(appNameOrPackage.trim(), 0)
+            return true
+        } catch (_: Exception) {}
+
+        if (query != appNameOrPackage.trim()) {
+            try {
+                if (pm.getLaunchIntentForPackage(query) != null) return true
+                pm.getPackageInfo(query, 0)
+                return true
+            } catch (_: Exception) {}
+        }
+
+        // 2. Query launcher activities
+        try {
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
+            val match = resolveInfos.firstOrNull { resolveInfo ->
+                val label = resolveInfo.loadLabel(pm).toString().lowercase()
+                val pkgName = resolveInfo.activityInfo.packageName.lowercase()
+                label == query || label.contains(query) || pkgName == query || pkgName.contains(query)
+            }
+            if (match != null) return true
+        } catch (_: Exception) {}
+
+        // 3. Fallback common package check
+        val fallbackPackage = when {
+            query.contains("whatsapp") -> "com.whatsapp"
+            query.contains("youtube") -> "com.google.android.youtube"
+            query.contains("spotify") -> "com.spotify.music"
+            query.contains("maps") || query.contains("mapa") -> "com.google.android.apps.maps"
+            query.contains("instagram") -> "com.instagram.android"
+            query.contains("facebook") -> "com.facebook.katana"
+            query.contains("telegram") -> "org.telegram.messenger"
+            query.contains("gmail") || query.contains("correo") -> "com.google.android.gm"
+            query.contains("calendar") || query.contains("calendario") -> "com.google.android.calendar"
+            query.contains("clock") || query.contains("reloj") -> "com.google.android.deskclock"
+            query.contains("netflix") -> "com.netflix.mediaclient"
+            else -> null
+        }
+        if (fallbackPackage != null) {
+            try {
+                if (pm.getLaunchIntentForPackage(fallbackPackage) != null) return true
+                pm.getPackageInfo(fallbackPackage, 0)
+                return true
+            } catch (_: Exception) {}
+        }
+
+        return false
+    }
+
     private fun sendWhatsAppMessage(context: Context, phone: String, message: String): String {
         return try {
             val encodedMessage = URLEncoder.encode(message, "UTF-8")
@@ -509,6 +574,14 @@ object DeviceController {
 
     private fun openUrl(context: Context, url: String) {
         try {
+            val lower = url.trim().lowercase()
+            val forbidden = listOf("intent:", "file:", "javascript:", "content:", "data:", "about:", "blob:")
+            if (forbidden.any { lower.startsWith(it) }) {
+                if (com.example.BuildConfig.DEBUG) {
+                    Log.w(TAG, "Blocked unsafe URL in openUrl")
+                }
+                return
+            }
             val formatted = if (!url.startsWith("http://") && !url.startsWith("https://")) "https://$url" else url
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(formatted)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

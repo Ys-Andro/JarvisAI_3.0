@@ -28,7 +28,9 @@ class ContextProvider(
                     append("\n\n[FRAGMENTOS DE DOCUMENTOS RECUPERADOS (RAG TOP-K)]: \n")
                     for (chunk in chunks) {
                         append("\n=== DOCUMENTO: \"${chunk.documentTitle}\" (Fragmento ${chunk.chunkIndex + 1}) ===\n")
+                        append("<untrusted_content>\n")
                         append(chunk.content)
+                        append("\n</untrusted_content>")
                         append("\n==================================================")
                     }
                 }
@@ -47,7 +49,7 @@ class ContextProvider(
                 if (documents.isNotEmpty()) {
                     append("\n\n[DOCUMENTOS]:\n")
                     for (d in documents) {
-                        append("- ${d.title}: ${d.content.take(1000)}\n")
+                        append("- ${d.title}: <untrusted_content>${d.content.take(1000)}</untrusted_content>\n")
                     }
                 }
             }

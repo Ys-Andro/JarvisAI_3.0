@@ -3,6 +3,12 @@ package com.example.jarvisai.presentation.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
+import com.example.jarvisai.data.action.ActionExecutionResult
+import com.example.jarvisai.data.action.ActionExecutor
+import com.example.jarvisai.data.action.ActionParser
+import com.example.jarvisai.data.action.ActionRequest
+import com.example.jarvisai.data.action.ActionValidator
+import com.example.jarvisai.data.action.PermissionPolicy
 import com.example.jarvisai.data.agent.AgentOrchestrator
 import com.example.jarvisai.domain.model.CloudAiModel
 import com.example.jarvisai.domain.model.GenerationSettings
@@ -26,6 +32,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.util.UUID
 
 class ChatViewModel(
@@ -36,7 +43,8 @@ class ChatViewModel(
     private val documentRepository: IDocumentRepository,
     private val memoryRepository: IMemoryRepository,
     val liveVoiceEngine: ILiveVoiceEngine,
-    private val agentOrchestrator: AgentOrchestrator
+    private val agentOrchestrator: AgentOrchestrator,
+    private val actionExecutor: ActionExecutor? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -54,6 +62,13 @@ class ChatViewModel(
         observeKnowledgeAndMemories()
         initDefaultConversation()
         setupLiveVoiceEngine()
+        setupActionConfirmationListener()
+    }
+
+    private fun setupActionConfirmationListener() {
+        ActionParser.onConfirmationRequested = { request, jsonPayload ->
+            triggerActionConfirmation(request, jsonPayload)
+        }
     }
 
     private fun observeKnowledgeAndMemories() {
@@ -197,9 +212,13 @@ class ChatViewModel(
         }
         if (provider == ModelProvider.GEMINI) {
             val provKey = providerKeys["gemini"]
-            val buildKey = try {
-                BuildConfig.GEMINI_API_KEY
-            } catch (_: Throwable) {
+            val buildKey = if (BuildConfig.DEBUG) {
+                try {
+                    BuildConfig.GEMINI_API_KEY
+                } catch (_: Throwable) {
+                    ""
+                }
+            } else {
                 ""
             }
             return !provKey.isNullOrBlank() ||
@@ -515,6 +534,7 @@ class ChatViewModel(
                 )
                 conversationRepository.updateMessageContent(assistantMsgId, result, 0f, System.currentTimeMillis() - startTime)
                 _uiState.update { it.copy(streamingMessageId = null, tokensPerSecond = 0f) }
+                checkAndTriggerPendingAction(result)
                 if (settings.autoTts && result.isNotBlank()) speakText(result)
             } catch (e: Exception) {
                 val message = "No pude completar la tarea agéntica: ${e.message ?: "error desconocido"}"
@@ -586,10 +606,114 @@ class ChatViewModel(
                     durationMs = finalElapsedMs
                 )
             }
+            checkAndTriggerPendingAction(finalResponse)
             if (settings.autoTts && finalResponse.isNotBlank()) {
                 speakText(finalResponse)
             }
         }
+    }
+
+    fun triggerActionConfirmation(request: ActionRequest, jsonPayload: String? = null) {
+        _uiState.update {
+            it.copy(
+                pendingActionConfirmation = request,
+                pendingActionJson = jsonPayload
+            )
+        }
+    }
+
+    fun confirmPendingAction() {
+        val request = _uiState.value.pendingActionConfirmation ?: return
+        val jsonPayload = _uiState.value.pendingActionJson
+        val conversationId = currentConversationId
+        _uiState.update {
+            it.copy(
+                pendingActionConfirmation = null,
+                pendingActionJson = null
+            )
+        }
+
+        viewModelScope.launch {
+            val executor = actionExecutor
+            val result = if (executor != null) {
+                if (!jsonPayload.isNullOrBlank()) {
+                    executor.executeActionJson(jsonPayload, skipConfirmation = true)
+                } else {
+                    executor.executeConfirmed(request)
+                }
+            } else {
+                ActionExecutionResult.Error("Ejecutor de acciones no disponible.")
+            }
+
+            val resultText = when (result) {
+                is ActionExecutionResult.Success -> "✓ Acción ${request.action} ejecutada: ${result.message}"
+                is ActionExecutionResult.Error -> "⚠️ Error al ejecutar ${request.action}: ${result.reason}"
+                is ActionExecutionResult.Denied -> "🚫 Acción denegada: ${result.reason}"
+                is ActionExecutionResult.RequiresConfirmation -> "🔒 Requiere confirmación: ${result.prompt}"
+            }
+
+            if (conversationId != null) {
+                val assistantMsg = Message(
+                    id = UUID.randomUUID().toString(),
+                    conversationId = conversationId,
+                    role = Role.ASSISTANT,
+                    content = resultText,
+                    timestamp = System.currentTimeMillis()
+                )
+                conversationRepository.insertMessage(assistantMsg)
+            }
+        }
+    }
+
+    fun cancelPendingAction() {
+        val request = _uiState.value.pendingActionConfirmation
+        val conversationId = currentConversationId
+        _uiState.update {
+            it.copy(
+                pendingActionConfirmation = null,
+                pendingActionJson = null
+            )
+        }
+        if (request != null && conversationId != null) {
+            viewModelScope.launch {
+                val assistantMsg = Message(
+                    id = UUID.randomUUID().toString(),
+                    conversationId = conversationId,
+                    role = Role.ASSISTANT,
+                    content = "🚫 Acción ${request.action} cancelada por el usuario. No se ha ejecutado ninguna operación.",
+                    timestamp = System.currentTimeMillis()
+                )
+                conversationRepository.insertMessage(assistantMsg)
+            }
+        }
+    }
+
+    private fun checkAndTriggerPendingAction(text: String) {
+        if (_uiState.value.pendingActionConfirmation != null) return
+        val actionRegex = "\\[JARVIS_ACTION:\\s*(\\{[\\s\\S]*?\\})\\]".toRegex()
+        val codeRegex = "```(?:json)?\\s*(\\{[\\s\\S]*?\"action\"[\\s\\S]*?\\})\\s*```".toRegex()
+        val match = actionRegex.find(text) ?: codeRegex.find(text) ?: return
+        val jsonPayload = match.groupValues[1]
+        try {
+            val json = JSONObject(jsonPayload)
+            val actionName = json.optString("action")
+            val params = mutableMapOf<String, Any>()
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                if (key != "action") {
+                    params[key] = json.get(key)
+                }
+            }
+            val valResult = ActionValidator().validate(actionName, params)
+            if (valResult.isSuccess) {
+                val req = valResult.getOrThrow()
+                val policyResult = PermissionPolicy().evaluate(req)
+                if (policyResult is ActionExecutionResult.RequiresConfirmation) {
+                    triggerActionConfirmation(req, jsonPayload)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     fun stopGeneration() {
@@ -734,6 +858,7 @@ class ChatViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        ActionParser.onConfirmationRequested = null
         generationJob?.cancel()
         liveVoiceEngine.release()
         viewModelScope.launch {

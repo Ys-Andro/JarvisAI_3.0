@@ -1,6 +1,7 @@
 package com.example.jarvisai.data.api.gemini
 
 import android.util.Log
+import com.example.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
@@ -16,15 +17,18 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-class GeminiApiClient {
+class GeminiApiClient(
+    private val baseUrl: String = BASE_URL
+) {
 
     companion object {
         private const val TAG = "GeminiApiClient"
-        private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+        const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
     }
 
     /**
      * Streams completion tokens from the Gemini streamGenerateContent endpoint using SSE/chunked response.
+     * The API key is securely transmitted via the "x-goog-api-key" header instead of the URL query string.
      */
     fun streamGenerateContent(
         apiKey: String,
@@ -35,7 +39,7 @@ class GeminiApiClient {
         config: GeminiGenerationConfig,
         inlineData: GeminiInlineData? = null
     ): Flow<String> = flow {
-        val endpoint = "$BASE_URL/$modelName:streamGenerateContent?alt=sse&key=$apiKey"
+        val endpoint = "$baseUrl/$modelName:streamGenerateContent?alt=sse"
         val requestJson = GeminiJsonMapper.buildRequestBody(prompt, history, systemPrompt, config, inlineData)
 
         var connection: HttpURLConnection? = null
@@ -51,6 +55,9 @@ class GeminiApiClient {
                 readTimeout = 30000
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "text/event-stream")
+                if (apiKey.isNotBlank()) {
+                    setRequestProperty("x-goog-api-key", apiKey)
+                }
             }
 
             OutputStreamWriter(connection.outputStream, "UTF-8").use { writer ->
@@ -63,7 +70,9 @@ class GeminiApiClient {
                 val errorStream = connection.errorStream
                 val errorBody = errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $responseCode"
                 val detailedError = parseErrorMessage(errorBody, responseCode)
-                Log.e(TAG, "Gemini API error ($responseCode): $detailedError")
+                if (BuildConfig.DEBUG) {
+                    Log.e(TAG, "Gemini API error ($responseCode): $detailedError")
+                }
                 throw IllegalStateException(detailedError)
             }
 
@@ -93,6 +102,7 @@ class GeminiApiClient {
 
     /**
      * Test connection with a minimal request to validate the API key.
+     * Transmits the key in the "x-goog-api-key" header.
      */
     suspend fun validateApiKey(apiKey: String, modelName: String): Result<Boolean> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
@@ -101,7 +111,7 @@ class GeminiApiClient {
 
         var connection: HttpURLConnection? = null
         try {
-            val endpoint = "$BASE_URL/$modelName:generateContent?key=$apiKey"
+            val endpoint = "$baseUrl/$modelName:generateContent"
             val url = URL(endpoint)
             connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -110,6 +120,9 @@ class GeminiApiClient {
                 connectTimeout = 10000
                 readTimeout = 15000
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                if (apiKey.isNotBlank()) {
+                    setRequestProperty("x-goog-api-key", apiKey)
+                }
             }
 
             val simpleBody = JSONObject().apply {
@@ -130,7 +143,11 @@ class GeminiApiClient {
                 Result.success(true)
             } else {
                 val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
-                Result.failure(IllegalStateException(parseErrorMessage(err, code)))
+                val detailedError = parseErrorMessage(err, code)
+                if (BuildConfig.DEBUG) {
+                    Log.e(TAG, "Gemini API validation error ($code): $detailedError")
+                }
+                Result.failure(IllegalStateException(detailedError))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -143,16 +160,16 @@ class GeminiApiClient {
         return try {
             val json = JSONObject(errorBody)
             val errorObj = json.optJSONObject("error")
-            val message = errorObj?.optString("message") ?: errorBody
+            val message = errorObj?.optString("message") ?: ""
             when (httpCode) {
-                400 -> "Solicitud inválida: $message"
+                400 -> if (message.isNotBlank()) "Solicitud inválida: $message" else "Solicitud inválida"
                 401, 403 -> "API Key no válida o sin permisos. Verifica tu clave de Gemini API."
                 429 -> "Límite de cuota excedido (Rate limit). Intenta de nuevo en unos momentos."
                 500, 503 -> "Servidor de Gemini no disponible temporalmente. Intenta más tarde."
-                else -> "Error de Gemini ($httpCode): $message"
+                else -> if (message.isNotBlank()) "Error de Gemini ($httpCode): $message" else "Error de Gemini ($httpCode)"
             }
         } catch (_: Exception) {
-            "Error HTTP $httpCode: $errorBody"
+            "Error HTTP $httpCode"
         }
     }
 }

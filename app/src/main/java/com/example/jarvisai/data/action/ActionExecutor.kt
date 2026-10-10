@@ -10,11 +10,15 @@ class ActionExecutor(
     private val context: Context,
     private val memoryRepository: IMemoryRepository? = null
 ) {
-    private val validator = ActionValidator()
+    private val validator = ActionValidator(context)
     private val policy = PermissionPolicy()
     private val automationScheduler = AutomationScheduler(context, com.example.jarvisai.data.local.database.JarvisDatabase.getInstance(context).automationDao())
 
-    suspend fun executeActionJson(jsonString: String): ActionExecutionResult {
+    suspend fun executeActionJson(
+        jsonString: String,
+        skipConfirmation: Boolean = false,
+        hasExternalContent: Boolean = false
+    ): ActionExecutionResult {
         return try {
             val json = JSONObject(jsonString)
             val actionName = json.optString("action")
@@ -33,9 +37,15 @@ class ActionExecutor(
             }
 
             val request = validationResult.getOrThrow()
-            val policyResult = policy.evaluate(request)
-            if (policyResult is ActionExecutionResult.Denied) {
-                return policyResult
+            val isSensitive = ActionRegistry.isSensitive(request.action)
+            // If turn included external content, every sensitive action MUST require confirmation
+            val effectiveSkipConfirmation = if (hasExternalContent && isSensitive) false else skipConfirmation
+
+            if (!effectiveSkipConfirmation) {
+                val policyResult = policy.evaluate(request, hasExternalContent)
+                if (policyResult is ActionExecutionResult.Denied || policyResult is ActionExecutionResult.RequiresConfirmation) {
+                    return policyResult
+                }
             }
 
             // Handle persistent automation actions before device execution.
@@ -53,12 +63,14 @@ class ActionExecutor(
                     if (triggerAt <= System.currentTimeMillis() || actionJson.isBlank()) {
                         return ActionExecutionResult.Error("SCHEDULE_ACTION requiere triggerAt futuro o delaySeconds y un actionJson válido.")
                     }
-                    val scheduledAction = try { JSONObject(actionJson).optString("action").uppercase() } catch (_: Exception) { "" }
-                    if (ActionRegistry.isSensitive(scheduledAction)) {
-                        return ActionExecutionResult.RequiresConfirmation(
-                            request,
-                            "La automatización contiene una acción sensible ($scheduledAction) y requiere confirmación explícita."
-                        )
+                    if (!effectiveSkipConfirmation) {
+                        val scheduledAction = try { JSONObject(actionJson).optString("action").uppercase() } catch (_: Exception) { "" }
+                        if (ActionRegistry.isSensitive(scheduledAction)) {
+                            return ActionExecutionResult.RequiresConfirmation(
+                                request,
+                                "La automatización contiene una acción sensible ($scheduledAction) y requiere confirmación explícita."
+                            )
+                        }
                     }
                     val id = automationScheduler.schedule(title, triggerAt, actionJson, intervalMinutes)
                     return ActionExecutionResult.Success("Automatización programada: $title (ID $id).")
@@ -121,5 +133,12 @@ class ActionExecutor(
         } catch (e: Exception) {
             ActionExecutionResult.Error("Error al ejecutar la acción: ${e.message}")
         }
+    }
+
+    suspend fun executeConfirmed(request: ActionRequest): ActionExecutionResult {
+        val paramsWithAction = request.parameters.toMutableMap()
+        paramsWithAction["action"] = request.action
+        val jsonString = JSONObject(paramsWithAction).toString()
+        return executeActionJson(jsonString, skipConfirmation = true)
     }
 }

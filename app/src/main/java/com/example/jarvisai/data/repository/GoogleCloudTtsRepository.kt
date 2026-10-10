@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.util.Base64
 import android.util.Log
+import com.example.BuildConfig
 import com.example.jarvisai.domain.repository.ISettingsRepository
 import com.example.jarvisai.domain.repository.ITtsRepository
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +40,9 @@ class GoogleCloudTtsRepository(
             ?: settingsRepository.getProviderApiKey("gemini").first()?.takeIf { it.isNotBlank() } ?: ""
 
         if (apiKey.isBlank()) {
-            Log.w(TAG, "Google Cloud TTS API key not found in settings. Falling back to Android TTS.")
+            if (BuildConfig.DEBUG) {
+                Log.w(TAG, "Google Cloud TTS API key not found in settings. Falling back to Android TTS.")
+            }
             fallbackTts.speak(text, pitch, speed)
             return@withContext
         }
@@ -48,7 +51,7 @@ class GoogleCloudTtsRepository(
         if (cleanText.isEmpty()) return@withContext
 
         try {
-            val url = URL("$TTS_ENDPOINT?key=$apiKey")
+            val url = URL(TTS_ENDPOINT)
             val connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doOutput = true
@@ -56,6 +59,9 @@ class GoogleCloudTtsRepository(
                 connectTimeout = 10000
                 readTimeout = 15000
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                if (apiKey.isNotBlank()) {
+                    setRequestProperty("X-Goog-Api-Key", apiKey)
+                }
             }
 
             val requestJson = JSONObject().apply {
@@ -95,7 +101,9 @@ class GoogleCloudTtsRepository(
             playAudioBytes(audioBytes)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Google Cloud TTS failed (${e.message}). Falling back to Android TTS.", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "Google Cloud TTS failed: ${e.message}")
+            }
             fallbackTts.speak(text, pitch, speed)
         }
     }

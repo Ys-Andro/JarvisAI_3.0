@@ -112,6 +112,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jarvisai.data.util.DeviceController
 import com.example.jarvisai.domain.model.CloudAiModel
+import com.example.jarvisai.presentation.chat.components.ActionConfirmationDialog
 import com.example.jarvisai.presentation.chat.components.ChatInputBar
 import com.example.jarvisai.presentation.chat.components.MessageBubble
 import com.example.jarvisai.presentation.chat.components.ModelSelectionBottomSheet
@@ -517,6 +518,15 @@ fun ChatScreen(
                     }
                 }
             }
+        }
+
+        val pendingAction = uiState.pendingActionConfirmation
+        if (pendingAction != null) {
+            ActionConfirmationDialog(
+                request = pendingAction,
+                onConfirm = viewModel::confirmPendingAction,
+                onCancel = viewModel::cancelPendingAction
+            )
         }
 
         if (showLiveMode) {
