@@ -7,37 +7,56 @@
     android:padding="12dp"
     android:background="@drawable/bg_jarvis_widget">
 
-    <!-- Header: Arc Reactor + Brand Title -->
+    <!-- Header: Arc Reactor + Brand Title + Status -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="8dp">
+        android:layout_marginBottom="10dp">
 
         <ImageView
             android:id="@+id/widget_logo"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
             android:src="@drawable/ic_jarvis_reactor"
             android:contentDescription="JARVIS" />
 
-        <TextView
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="JARVIS 3.0 • EN LÍNEA"
-            android:textColor="#00E5FF"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:fontFamily="monospace" />
+            android:orientation="vertical"
+            android:layout_marginStart="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="J.A.R.V.I.S. 3.0"
+                android:textColor="#00E5FF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.08" />
+
+            <TextView
+                android:id="@+id/widget_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SISTEMA NEURAL ACTIVO"
+                android:textColor="#80A8C6"
+                android:textSize="9sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/widget_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ACTIVO"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:background="@drawable/bg_widget_status_pill"
+            android:text="ONLINE"
             android:textColor="#00E676"
             android:textSize="10sp"
             android:textStyle="bold"
@@ -60,25 +79,26 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="3dp"
             android:background="@drawable/bg_widget_button"
             android:clickable="true"
             android:focusable="true">
 
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@android:drawable/ic_btn_speak_now"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_widget_mic"
                 android:contentDescription="Hablar con Jarvis" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="3dp"
                 android:text="Hablar"
-                android:textColor="#FFFFFF"
+                android:textColor="#E0F7FA"
                 android:textSize="10sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:fontFamily="monospace" />
         </LinearLayout>
 
         <!-- Open Chat Button -->
@@ -89,25 +109,26 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_marginHorizontal="4dp"
+            android:layout_marginHorizontal="3dp"
             android:background="@drawable/bg_widget_button"
             android:clickable="true"
             android:focusable="true">
 
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@android:drawable/ic_menu_send"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_widget_chat"
                 android:contentDescription="Abrir Chat" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="3dp"
                 android:text="Chat"
-                android:textColor="#FFFFFF"
+                android:textColor="#E0F7FA"
                 android:textSize="10sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:fontFamily="monospace" />
         </LinearLayout>
 
         <!-- Toggle Bubble Button -->
@@ -118,25 +139,56 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_marginStart="4dp"
+            android:layout_marginHorizontal="3dp"
             android:background="@drawable/bg_widget_button"
             android:clickable="true"
             android:focusable="true">
 
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:src="@android:drawable/ic_menu_always_landscape_portrait"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_widget_bubble"
                 android:contentDescription="Burbuja Flotante" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="3dp"
                 android:text="Burbuja"
-                android:textColor="#FFFFFF"
+                android:textColor="#E0F7FA"
                 android:textSize="10sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
+        <!-- Quick Torch / Action Button -->
+        <LinearLayout
+            android:id="@+id/btn_widget_torch"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginStart="3dp"
+            android:background="@drawable/bg_widget_button"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_widget_torch"
+                android:contentDescription="Linterna Rápida" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="Linterna"
+                android:textColor="#E0F7FA"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace" />
         </LinearLayout>
     </LinearLayout>
 

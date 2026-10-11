@@ -22,24 +22,48 @@ class JarvisAppWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_TOGGLE_BUBBLE) {
-            if (DeviceController.canDrawOverlays(context)) {
-                if (JarvisFloatingBubbleService.isServiceRunning) {
-                    JarvisFloatingBubbleService.stop(context)
+        when (intent.action) {
+            ACTION_TOGGLE_BUBBLE -> {
+                if (DeviceController.canDrawOverlays(context)) {
+                    if (JarvisFloatingBubbleService.isServiceRunning) {
+                        JarvisFloatingBubbleService.stop(context)
+                    } else {
+                        JarvisFloatingBubbleService.start(context)
+                    }
                 } else {
-                    JarvisFloatingBubbleService.start(context)
+                    DeviceController.openOverlaySettings(context)
                 }
-            } else {
-                DeviceController.openOverlaySettings(context)
+                refreshAllWidgets(context)
+            }
+            ACTION_TOGGLE_TORCH -> {
+                isTorchActive = !isTorchActive
+                DeviceController.executeActionCommand(
+                    context,
+                    """{"action":"FLASHLIGHT","enable":$isTorchActive}"""
+                )
+                refreshAllWidgets(context)
             }
         }
     }
 
     companion object {
         const val ACTION_TOGGLE_BUBBLE = "com.example.jarvisai.ACTION_TOGGLE_BUBBLE"
+        const val ACTION_TOGGLE_TORCH = "com.example.jarvisai.ACTION_TOGGLE_TORCH"
+
+        private var isTorchActive = false
 
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val views = RemoteViews(context.packageName, R.layout.jarvis_app_widget)
+
+            // Dynamic status feedback
+            val isBubbleRunning = JarvisFloatingBubbleService.isServiceRunning
+            if (isBubbleRunning) {
+                views.setTextViewText(R.id.widget_status, "BURBUJA ON")
+                views.setTextColor(R.id.widget_status, 0xFF00E5FF.toInt())
+            } else {
+                views.setTextViewText(R.id.widget_status, "ONLINE")
+                views.setTextColor(R.id.widget_status, 0xFF00E676.toInt())
+            }
 
             // 1. Voice Intent (opens live mode or voice prompt in MainActivity)
             val voiceIntent = Intent(context, MainActivity::class.java).apply {
@@ -80,14 +104,30 @@ class JarvisAppWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.btn_widget_bubble, bubblePendingIntent)
 
+            // 4. Quick Torch Broadcast Intent
+            val torchIntent = Intent(context, JarvisAppWidgetProvider::class.java).apply {
+                action = ACTION_TOGGLE_TORCH
+            }
+            val torchPendingIntent = PendingIntent.getBroadcast(
+                context,
+                104,
+                torchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.btn_widget_torch, torchPendingIntent)
+
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
 
         fun refreshAllWidgets(context: Context) {
-            val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(ComponentName(context, JarvisAppWidgetProvider::class.java))
-            for (id in ids) {
-                updateAppWidget(context, manager, id)
+            try {
+                val manager = AppWidgetManager.getInstance(context)
+                val ids = manager.getAppWidgetIds(ComponentName(context, JarvisAppWidgetProvider::class.java))
+                for (id in ids) {
+                    updateAppWidget(context, manager, id)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }

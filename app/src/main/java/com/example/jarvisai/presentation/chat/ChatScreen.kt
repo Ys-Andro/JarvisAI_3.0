@@ -260,14 +260,6 @@ fun ChatScreen(
         }
     }
 
-    // Keep up with streaming message only if user is already near the bottom
-    // Never interrupts reading if user scrolled up
-    LaunchedEffect(uiState.messages.lastOrNull()?.content?.length) {
-        if (isNearBottom && uiState.messages.isNotEmpty()) {
-            listState.scrollToItem(uiState.messages.size - 1)
-        }
-    }
-
     // Show error snackbar if any
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { error ->
@@ -375,14 +367,22 @@ fun ChatScreen(
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (uiState.isSpeakingTts) "JARVIS RESPONDIENDO..." else "JARVIS PENSANDO...",
+                                        text = when {
+                                            uiState.isSpeakingTts -> "JARVIS RESPONDIENDO..."
+                                            uiState.tokensPerSecond > 0f || uiState.streamingMessageId != null -> "JARVIS GENERANDO..."
+                                            else -> "JARVIS PENSANDO..."
+                                        },
                                         color = JarvisPrimary,
                                         fontSize = 11.sp,
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = if (uiState.isSpeakingTts) "Voz activa en tiempo real..." else "Procesando razonamiento y conectando datos...",
+                                        text = when {
+                                            uiState.isSpeakingTts -> "Voz activa en tiempo real..."
+                                            uiState.tokensPerSecond > 0f || uiState.streamingMessageId != null -> "Transmitiendo respuesta en tiempo real..."
+                                            else -> "Procesando razonamiento y conectando datos..."
+                                        },
                                         color = JarvisTextSecondary,
                                         fontSize = 10.sp
                                     )
@@ -477,8 +477,7 @@ fun ChatScreen(
                                 message = message,
                                 isSpeaking = uiState.isSpeakingTts && message.role != com.example.jarvisai.domain.model.Role.USER,
                                 onSpeakClick = { viewModel.speakText(it) },
-                                onStopSpeakClick = { viewModel.stopTts() },
-                                modifier = Modifier.animateItem()
+                                onStopSpeakClick = { viewModel.stopTts() }
                             )
                         }
                     }

@@ -36,6 +36,7 @@ import com.example.jarvisai.domain.model.Message
 import com.example.jarvisai.domain.voice.LiveVoicePhase
 import com.example.jarvisai.presentation.overlay.FloatingBubbleOrb
 import com.example.jarvisai.presentation.overlay.FloatingOverlayHud
+import com.example.jarvisai.presentation.widget.JarvisAppWidgetProvider
 import com.example.jarvisai.ui.theme.JarvisAiTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -151,6 +152,7 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
 
         setupBubbleView()
         observeVoiceAndTts()
+        JarvisAppWidgetProvider.refreshAllWidgets(this)
     }
 
     private fun createNotificationChannel() {
@@ -256,24 +258,50 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
                             isListening = isListening,
                             isSpeaking = isSpeaking,
                             isThinking = isThinking,
-                            onClick = { setExpandedState(true) }
+                            onClick = {
+                                params.alpha = 1.0f
+                                setExpandedState(true)
+                            },
+                            onDrag = { dx, dy ->
+                                params.alpha = 1.0f
+                                params.x += dx.toInt()
+                                params.y += dy.toInt()
+                                try {
+                                    windowManager.updateViewLayout(composeView, params)
+                                } catch (e: Exception) {}
+                            },
+                            onRestoreAlpha = {
+                                params.alpha = 1.0f
+                                try {
+                                    windowManager.updateViewLayout(composeView, params)
+                                } catch (e: Exception) {}
+                            },
+                            onSnapToEdge = {
+                                val currentDisplay = windowManager.defaultDisplay
+                                val currentSize = Point()
+                                currentDisplay.getSize(currentSize)
+                                val currentScreenWidth = currentSize.x
+                                if (params.x < currentScreenWidth / 2) {
+                                    params.x = 20
+                                } else {
+                                    params.x = currentScreenWidth - 200 - 20
+                                }
+                                try {
+                                    windowManager.updateViewLayout(composeView, params)
+                                } catch (e: Exception) {}
+                            },
+                            onDoubleTap = {
+                                stopSelf()
+                            }
                         )
                     }
                 }
             }
 
-            // Draggable Touch Listener
-            var initialX = 0
-            var initialY = 0
-            var initialTouchX = 0f
-            var initialTouchY = 0f
-            var touchStartTime = 0L
-            var lastClickTime = 0L
-
             // Idle opacity fade task (50% less visible when idle)
             serviceScope.launch {
                 while (true) {
-                    kotlinx.coroutines.delay(4000)
+                    kotlinx.coroutines.delay(6000)
                     if (!isExpanded && !isListening && !isSpeaking && !isThinking) {
                         params.alpha = 0.5f
                         try {
@@ -283,69 +311,12 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
                 }
             }
 
-            setOnTouchListener { view, event ->
-                if (isExpanded) {
-                    if (event.action == MotionEvent.ACTION_OUTSIDE) {
-                        setExpandedState(false)
-                        return@setOnTouchListener true
-                    }
-                    return@setOnTouchListener false
-                }
-
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        initialX = params.x
-                        initialY = params.y
-                        initialTouchX = event.rawX
-                        initialTouchY = event.rawY
-                        touchStartTime = System.currentTimeMillis()
-                        params.alpha = 1.0f // Full visibility on touch
-                        try {
-                            windowManager.updateViewLayout(composeView, params)
-                        } catch (e: Exception) {}
-                        true
-                    }
-
-                    MotionEvent.ACTION_MOVE -> {
-                        params.x = initialX + (event.rawX - initialTouchX).toInt()
-                        params.y = initialY + (event.rawY - initialTouchY).toInt()
-                        windowManager.updateViewLayout(composeView, params)
-                        true
-                    }
-
-                    MotionEvent.ACTION_UP -> {
-                        val duration = System.currentTimeMillis() - touchStartTime
-                        val dx = abs(event.rawX - initialTouchX)
-                        val dy = abs(event.rawY - initialTouchY)
-
-                        if (dx < 15 && dy < 15 && duration < 300) {
-                            val now = System.currentTimeMillis()
-                            if (now - lastClickTime < 400) {
-                                // Double tap detected -> close/stop service
-                                stopSelf()
-                            } else {
-                                lastClickTime = now
-                                params.alpha = 1.0f
-                                setExpandedState(true)
-                            }
-                        } else {
-                            // Magnetic snap to edge
-                            val currentDisplay = windowManager.defaultDisplay
-                            val currentSize = Point()
-                            currentDisplay.getSize(currentSize)
-                            val currentScreenWidth = currentSize.x
-
-                            if (params.x < currentScreenWidth / 2) {
-                                params.x = 20
-                            } else {
-                                params.x = currentScreenWidth - view.width - 20
-                            }
-                            windowManager.updateViewLayout(composeView, params)
-                        }
-                        true
-                    }
-
-                    else -> false
+            setOnTouchListener { _, event ->
+                if (isExpanded && event.action == MotionEvent.ACTION_OUTSIDE) {
+                    setExpandedState(false)
+                    true
+                } else {
+                    false
                 }
             }
         }
@@ -362,6 +333,8 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
         val params = layoutParams ?: return
         val compose = composeView ?: return
 
+        params.alpha = 1.0f // Ensure full opacity when expanded
+
         if (expanded) {
             val display = windowManager.defaultDisplay
             val size = Point()
@@ -371,6 +344,8 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
             params.width = (screenWidth * 0.94f).toInt()
             params.height = WindowManager.LayoutParams.WRAP_CONTENT
             params.x = (screenWidth - params.width) / 2
+            params.y = 120
+            params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
             params.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
         } else {
@@ -525,6 +500,7 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
     override fun onDestroy() {
         super.onDestroy()
         isServiceRunning = false
+        JarvisAppWidgetProvider.refreshAllWidgets(this)
         composeView?.let {
             try {
                 windowManager.removeView(it)

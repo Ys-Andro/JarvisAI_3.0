@@ -3,7 +3,10 @@ package com.example.jarvisai.presentation.overlay
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.abs
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -15,6 +18,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,11 +42,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FlashlightOn
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
@@ -62,7 +67,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.example.jarvisai.ui.mascot.MascotController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,9 +74,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,6 +86,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jarvisai.data.util.DeviceController
 import com.example.jarvisai.presentation.chat.components.SimpleMarkdownText
+import com.example.jarvisai.ui.mascot.JarvisMascot
+import com.example.jarvisai.ui.mascot.MascotController
 import com.example.jarvisai.ui.theme.JarvisAccentCyan
 import com.example.jarvisai.ui.theme.JarvisAccentGreen
 import com.example.jarvisai.ui.theme.JarvisAccentOrange
@@ -94,12 +102,10 @@ import com.example.jarvisai.ui.theme.JarvisSurfaceVariant
 import com.example.jarvisai.ui.theme.JarvisTextPrimary
 import com.example.jarvisai.ui.theme.JarvisTextSecondary
 import com.example.jarvisai.ui.theme.JarvisTextTertiary
-import com.example.jarvisai.ui.mascot.JarvisMascot
-import com.example.jarvisai.ui.mascot.MascotExpression
-import com.example.jarvisai.ui.mascot.MascotState
 
 /**
- * Compact Floating Bubble Orb representation with enhanced futuristic aesthetics.
+ * Compact Floating Bubble Orb representation with enhanced futuristic aesthetics,
+ * reactive arc-reactor energy aura, spinning tech rings, and animated mascot.
  */
 @Composable
 fun FloatingBubbleOrb(
@@ -107,6 +113,10 @@ fun FloatingBubbleOrb(
     isSpeaking: Boolean,
     isThinking: Boolean,
     onClick: () -> Unit,
+    onDrag: (Float, Float) -> Unit = { _, _ -> },
+    onRestoreAlpha: () -> Unit = {},
+    onSnapToEdge: () -> Unit = {},
+    onDoubleTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "bubble_orb_anim")
@@ -114,17 +124,17 @@ fun FloatingBubbleOrb(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(6000, easing = LinearEasing),
+            animation = tween(5000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "rotation"
     )
 
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.90f,
-        targetValue = 1.12f,
+    val auraPulse by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = FastOutSlowInEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
@@ -136,39 +146,157 @@ fun FloatingBubbleOrb(
     }
     val mascotState by mascotController.state.collectAsState()
     val mascotExpression by mascotController.expression.collectAsState()
-    val mascotAmplitude by mascotController.audioAmplitude.collectAsState()
+
+    val stateColor = when {
+        isListening -> JarvisAccentCyan
+        isThinking -> JarvisAccentOrange
+        isSpeaking -> JarvisAccentGreen
+        else -> JarvisPrimary
+    }
 
     Box(
         modifier = modifier
-            .size(68.dp)
-            .clip(CircleShape)
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(
-                        JarvisSurfaceElevated,
-                        JarvisBackground
-                    )
-                )
-            )
-            .border(
-                width = 2.dp,
-                brush = Brush.sweepGradient(
-                    colors = listOf(
-                        JarvisAccentCyan,
-                        JarvisPrimary,
-                        JarvisAccentCyan.copy(alpha = 0.5f),
-                        JarvisPrimary
-                    )
-                ),
-                shape = CircleShape
-            )
+            .size(72.dp)
+            .pointerInput(Unit) {
+                var totalDragX = 0f
+                var totalDragY = 0f
+                var isDragging = false
+                var lastClickTime = 0L
+
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    onRestoreAlpha()
+                    val startTime = System.currentTimeMillis()
+                    totalDragX = 0f
+                    totalDragY = 0f
+                    isDragging = false
+
+                    var pointer = down
+                    do {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == pointer.id } ?: break
+
+                        if (change.pressed) {
+                            val dragDelta = change.position - change.previousPosition
+                            totalDragX += dragDelta.x
+                            totalDragY += dragDelta.y
+
+                            if (!isDragging && (abs(totalDragX) > 10f || abs(totalDragY) > 10f)) {
+                                isDragging = true
+                            }
+
+                            if (isDragging) {
+                                onRestoreAlpha()
+                                onDrag(dragDelta.x, dragDelta.y)
+                                change.consume()
+                            }
+                        } else {
+                            val duration = System.currentTimeMillis() - startTime
+                            if (!isDragging && duration < 300 && abs(totalDragX) < 15f && abs(totalDragY) < 15f) {
+                                val now = System.currentTimeMillis()
+                                if (now - lastClickTime < 400) {
+                                    onDoubleTap()
+                                } else {
+                                    lastClickTime = now
+                                    onRestoreAlpha()
+                                    onClick()
+                                }
+                            } else if (isDragging) {
+                                onSnapToEdge()
+                            }
+                            break
+                        }
+                    } while (true)
+                }
+            }
             .testTag("floating_bubble_orb"),
         contentAlignment = Alignment.Center
     ) {
-        JarvisMascot(
-            state = mascotState,
-            expression = mascotExpression,
-            size = 56.dp
+        // Futuristic Arc-Reactor Energy Canvas
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val baseRadius = size.minDimension / 2f - 4f
+
+            // Outer energy aura glow
+            drawCircle(
+                color = stateColor.copy(alpha = 0.22f * auraPulse),
+                radius = baseRadius * auraPulse,
+                center = center
+            )
+
+            // Outer tech ring with rotating ticks
+            val ringRadius = baseRadius - 2f
+            drawCircle(
+                color = stateColor.copy(alpha = 0.45f),
+                radius = ringRadius,
+                center = center,
+                style = Stroke(width = 1.5f)
+            )
+
+            // Rotating cyber tick segments
+            val tickCount = 8
+            for (i in 0 until tickCount) {
+                val angleRad = Math.toRadians((rotation + (i * 45)).toDouble())
+                val innerR = ringRadius - 3f
+                val outerR = ringRadius + 3f
+                val startX = (center.x + innerR * Math.cos(angleRad)).toFloat()
+                val startY = (center.y + innerR * Math.sin(angleRad)).toFloat()
+                val endX = (center.x + outerR * Math.cos(angleRad)).toFloat()
+                val endY = (center.y + outerR * Math.sin(angleRad)).toFloat()
+
+                drawLine(
+                    color = stateColor.copy(alpha = if (i % 2 == 0) 0.9f else 0.4f),
+                    start = Offset(startX, startY),
+                    end = Offset(endX, endY),
+                    strokeWidth = 2f
+                )
+            }
+        }
+
+        // Inner Mascot Core Sphere
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            JarvisSurfaceElevated,
+                            Color(0xFF070B14),
+                            JarvisBackground
+                        )
+                    )
+                )
+                .border(
+                    width = 1.8.dp,
+                    brush = Brush.sweepGradient(
+                        colors = listOf(
+                            stateColor,
+                            JarvisPrimaryLight,
+                            stateColor.copy(alpha = 0.5f),
+                            stateColor
+                        )
+                    ),
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            JarvisMascot(
+                state = mascotState,
+                expression = mascotExpression,
+                size = 46.dp
+            )
+        }
+
+        // Mini Status LED indicator in top-right
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 4.dp, end = 4.dp)
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(stateColor)
+                .border(1.5.dp, JarvisBackground, CircleShape)
         )
     }
 }
@@ -183,9 +311,9 @@ fun AudioWaveformVisualizer(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "waveform")
-    
+
     Row(
-        modifier = modifier.height(20.dp),
+        modifier = modifier.height(18.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -196,7 +324,7 @@ fun AudioWaveformVisualizer(
                 targetValue = 1f,
                 animationSpec = infiniteRepeatable(
                     animation = tween(
-                        durationMillis = 300 + (i * 90),
+                        durationMillis = 280 + (i * 85),
                         easing = FastOutSlowInEasing
                     ),
                     repeatMode = RepeatMode.Reverse
@@ -211,7 +339,7 @@ fun AudioWaveformVisualizer(
                     .width(3.dp)
                     .height((16 * heightFraction).dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(tintColor.copy(alpha = if (isActive) 0.9f else 0.4f))
+                    .background(tintColor.copy(alpha = if (isActive) 0.95f else 0.4f))
             )
         }
     }
@@ -240,7 +368,7 @@ fun HolographicTypewriterText(
         if (text.isNotEmpty()) {
             for (i in 1..text.length) {
                 displayedText = text.substring(0, i)
-                val delayMs = if (text.length > 150) 6L else 14L
+                val delayMs = if (text.length > 150) 6L else 12L
                 kotlinx.coroutines.delay(delayMs)
             }
         }
@@ -249,7 +377,7 @@ fun HolographicTypewriterText(
     Text(
         text = displayedText + (if (cursorVisible) "█" else " "),
         color = JarvisTextPrimary,
-        fontSize = 12.sp,
+        fontSize = 12.5.sp,
         fontFamily = FontFamily.Monospace,
         lineHeight = 18.sp,
         modifier = modifier
@@ -276,9 +404,12 @@ fun FloatingOverlayHud(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     var inputText by remember { mutableStateOf("") }
     var isScanningScreen by remember { mutableStateOf(false) }
     var isLauncherExpanded by remember { mutableStateOf(false) }
+    var isCopied by remember { mutableStateOf(false) }
+    var isFlashlightOn by remember { mutableStateOf(false) }
 
     if (isScanningScreen) {
         LaunchedEffect(Unit) {
@@ -288,9 +419,16 @@ fun FloatingOverlayHud(
         }
     }
 
+    LaunchedEffect(isCopied) {
+        if (isCopied) {
+            kotlinx.coroutines.delay(2000)
+            isCopied = false
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "hud_scan")
     val hudGlowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
+        initialValue = 0.65f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
             animation = tween(1400, easing = FastOutSlowInEasing),
@@ -302,30 +440,30 @@ fun FloatingOverlayHud(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(10.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .padding(8.dp)
+            .clip(RoundedCornerShape(26.dp))
             .border(
-                width = 2.dp,
+                width = 1.8.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
                         JarvisAccentCyan.copy(alpha = hudGlowPulse),
                         JarvisPrimary.copy(alpha = hudGlowPulse * 0.8f),
-                        JarvisAccentCyan.copy(alpha = hudGlowPulse * 0.4f)
+                        JarvisAccentCyan.copy(alpha = hudGlowPulse * 0.35f)
                     )
                 ),
-                shape = RoundedCornerShape(28.dp)
+                shape = RoundedCornerShape(26.dp)
             ),
-        color = JarvisSurfaceElevated.copy(alpha = 0.96f),
-        shadowElevation = 20.dp
+        color = JarvisSurfaceElevated.copy(alpha = 0.97f),
+        shadowElevation = 24.dp
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // HUD Top Decorative Status Bar
+                // HUD Top Status Bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -342,7 +480,7 @@ fun FloatingOverlayHud(
                                 .background(JarvisAccentCyan)
                         )
                         Text(
-                            text = "JARVIS HUD v3.5 // NEURAL OVERLAY",
+                            text = "JARVIS 3.0 // HUD TÁCTICO",
                             color = JarvisTextTertiary,
                             fontSize = 9.sp,
                             fontFamily = FontFamily.Monospace,
@@ -357,11 +495,11 @@ fun FloatingOverlayHud(
                         if (isListening || isSpeaking || isThinking) {
                             AudioWaveformVisualizer(
                                 isActive = true,
-                                tintColor = if (isListening) JarvisAccentCyan else JarvisAccentGreen
+                                tintColor = if (isListening) JarvisAccentCyan else if (isThinking) JarvisAccentOrange else JarvisAccentGreen
                             )
                         }
                         Text(
-                            text = if (isListening) "ESCUCHANDO" else if (isThinking) "PROCESANDO" else "OPERATIVO",
+                            text = if (isListening) "ESCUCHANDO" else if (isThinking) "PROCESANDO" else if (isSpeaking) "SINTETIZANDO" else "ONLINE",
                             color = if (isListening) JarvisAccentCyan else if (isThinking) JarvisAccentOrange else JarvisAccentGreen,
                             fontSize = 9.sp,
                             fontFamily = FontFamily.Monospace,
@@ -371,11 +509,11 @@ fun FloatingOverlayHud(
                 }
 
                 HorizontalDivider(
-                    color = JarvisBorder.copy(alpha = 0.6f),
+                    color = JarvisBorder.copy(alpha = 0.5f),
                     thickness = 1.dp
                 )
 
-                // HUD Header with Title & Controls
+                // HUD Header: Mascot + Title + Actions (App, Minimize, Close)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -396,17 +534,17 @@ fun FloatingOverlayHud(
                         JarvisMascot(
                             state = hudMascotState,
                             expression = hudMascotExpr,
-                            size = 44.dp
+                            size = 40.dp
                         )
 
                         Column {
                             Text(
                                 text = "J.A.R.V.I.S. INTELIGENCIA",
                                 color = JarvisPrimary,
-                                fontSize = 14.sp,
+                                fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.2.sp,
+                                letterSpacing = 1.1.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -422,17 +560,17 @@ fun FloatingOverlayHud(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // Open full app (Expand)
+                        // Open full app
                         IconButton(
                             onClick = onOpenFullApp,
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(32.dp)
                                 .background(JarvisSurface, CircleShape)
                                 .border(1.dp, JarvisBorder, CircleShape)
                         ) {
@@ -440,7 +578,7 @@ fun FloatingOverlayHud(
                                 imageVector = Icons.Default.OpenInFull,
                                 contentDescription = "Abrir App Completa",
                                 tint = JarvisPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         }
 
@@ -448,7 +586,7 @@ fun FloatingOverlayHud(
                         IconButton(
                             onClick = onMinimize,
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(32.dp)
                                 .background(JarvisSurface, CircleShape)
                                 .border(1.dp, JarvisBorder, CircleShape)
                         ) {
@@ -456,13 +594,29 @@ fun FloatingOverlayHud(
                                 imageVector = Icons.Default.Remove,
                                 contentDescription = "Minimizar",
                                 tint = JarvisTextSecondary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+
+                        // Close service
+                        IconButton(
+                            onClick = onCloseService,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(JarvisAccentRed.copy(alpha = 0.15f), CircleShape)
+                                .border(1.dp, JarvisAccentRed.copy(alpha = 0.6f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cerrar Burbuja",
+                                tint = JarvisAccentRed,
+                                modifier = Modifier.size(15.dp)
                             )
                         }
                     }
                 }
 
-                // Quick Tactical Automation Capsules Row 1
+                // Tactical Action Capsules Row 1
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -472,13 +626,13 @@ fun FloatingOverlayHud(
                         onClick = {
                             DeviceController.executeActionCommand(context, """{"action":"MUTE"}""")
                         },
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = JarvisSurfaceVariant,
                         border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder),
                         modifier = Modifier.weight(1f)
                     ) {
                         Row(
-                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 10.dp),
+                            modifier = Modifier.padding(vertical = 9.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
@@ -486,16 +640,15 @@ fun FloatingOverlayHud(
                                 imageVector = Icons.Default.VolumeMute,
                                 contentDescription = null,
                                 tint = JarvisTextSecondary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
                             Text(
                                 text = "SILENCIAR",
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = JarvisTextPrimary,
-                                letterSpacing = 0.5.sp
+                                color = JarvisTextPrimary
                             )
                         }
                     }
@@ -503,16 +656,16 @@ fun FloatingOverlayHud(
                     // Voice Mic Toggle Button
                     Surface(
                         onClick = onToggleVoice,
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (isListening) JarvisAccentCyan.copy(alpha = 0.28f) else JarvisPrimary.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isListening) JarvisAccentCyan.copy(alpha = 0.25f) else JarvisPrimary.copy(alpha = 0.12f),
                         border = androidx.compose.foundation.BorderStroke(
-                            width = 1.4.dp,
+                            width = 1.3.dp,
                             color = if (isListening) JarvisAccentCyan else JarvisPrimary
                         ),
                         modifier = Modifier.weight(1.2f)
                     ) {
                         Row(
-                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 10.dp),
+                            modifier = Modifier.padding(vertical = 9.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
@@ -520,73 +673,110 @@ fun FloatingOverlayHud(
                                 imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
                                 contentDescription = null,
                                 tint = if (isListening) JarvisAccentCyan else JarvisPrimary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
                             Text(
                                 text = if (isListening) "ESCUCHANDO..." else "VOZ ACTIVA",
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = if (isListening) JarvisAccentCyan else JarvisPrimary,
-                                letterSpacing = 0.5.sp
+                                color = if (isListening) JarvisAccentCyan else JarvisPrimary
+                            )
+                        }
+                    }
+
+                    // Quick Flashlight Toggle Button
+                    Surface(
+                        onClick = {
+                            isFlashlightOn = !isFlashlightOn
+                            DeviceController.executeActionCommand(
+                                context,
+                                """{"action":"FLASHLIGHT","enable":$isFlashlightOn}"""
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isFlashlightOn) JarvisAccentOrange.copy(alpha = 0.22f) else JarvisSurfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 1.dp,
+                            color = if (isFlashlightOn) JarvisAccentOrange else JarvisBorder
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 9.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FlashlightOn,
+                                contentDescription = null,
+                                tint = if (isFlashlightOn) JarvisAccentOrange else JarvisTextSecondary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = if (isFlashlightOn) "LUZ ON" else "LINTERNA",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isFlashlightOn) JarvisAccentOrange else JarvisTextPrimary
                             )
                         }
                     }
                 }
 
-                // Row 2: Holographic Scanner & Quick Apps Launcher
+                // Row 2: Holographic Screen Analyzer & Quick Apps Launcher
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Screen Capture Analyzer Button
+                    // Screen Analyzer Button
                     Surface(
                         onClick = { isScanningScreen = true },
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (isScanningScreen) Color(0xFF152A2D) else JarvisSurfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isScanningScreen) Color(0xFF142B30) else JarvisSurfaceVariant,
                         border = androidx.compose.foundation.BorderStroke(
                             width = 1.2.dp,
-                            color = if (isScanningScreen) Color(0xFF00E5FF) else JarvisBorder
+                            color = if (isScanningScreen) JarvisAccentCyan else JarvisBorder
                         ),
                         modifier = Modifier.weight(1f)
                     ) {
                         Row(
-                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 10.dp),
+                            modifier = Modifier.padding(vertical = 9.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_view),
                                 contentDescription = null,
-                                tint = if (isScanningScreen) Color(0xFF00E5FF) else JarvisTextSecondary,
-                                modifier = Modifier.size(16.dp)
+                                tint = if (isScanningScreen) JarvisAccentCyan else JarvisTextSecondary,
+                                modifier = Modifier.size(15.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
                             Text(
                                 text = "ESCANEAR PANTALLA",
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = if (isScanningScreen) Color(0xFF00E5FF) else JarvisTextPrimary,
-                                letterSpacing = 0.5.sp
+                                color = if (isScanningScreen) JarvisAccentCyan else JarvisTextPrimary
                             )
                         }
                     }
 
-                    // Launcher toggle capsule button
+                    // Quick Launcher Toggle
                     Surface(
                         onClick = { isLauncherExpanded = !isLauncherExpanded },
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (isLauncherExpanded) Color(0xFF1D283A) else JarvisSurfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isLauncherExpanded) Color(0xFF1B273A) else JarvisSurfaceVariant,
                         border = androidx.compose.foundation.BorderStroke(
                             width = 1.2.dp,
                             color = if (isLauncherExpanded) JarvisPrimary else JarvisBorder
                         ),
-                        modifier = Modifier.weight(1.1f)
+                        modifier = Modifier.weight(1f)
                     ) {
                         Row(
-                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 10.dp),
+                            modifier = Modifier.padding(vertical = 9.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
@@ -594,22 +784,21 @@ fun FloatingOverlayHud(
                                 painter = painterResource(id = android.R.drawable.ic_dialog_dialer),
                                 contentDescription = null,
                                 tint = if (isLauncherExpanded) JarvisPrimary else JarvisTextSecondary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
                             Text(
                                 text = "ACCESOS RÁPIDOS",
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = if (isLauncherExpanded) JarvisPrimary else JarvisTextPrimary,
-                                letterSpacing = 0.5.sp
+                                color = if (isLauncherExpanded) JarvisPrimary else JarvisTextPrimary
                             )
                         }
                     }
                 }
 
-                // Expandable Sys Launcher tray
+                // Expandable App Launcher Tray
                 AnimatedVisibility(
                     visible = isLauncherExpanded,
                     enter = slideInVertically(initialOffsetY = { -it / 2 }) + fadeIn(),
@@ -621,11 +810,11 @@ fun FloatingOverlayHud(
                             .clip(RoundedCornerShape(14.dp))
                             .background(JarvisSurface)
                             .border(1.dp, JarvisBorder, RoundedCornerShape(14.dp))
-                            .padding(10.dp),
+                            .padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Web browser trigger
+                        // Web Search
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
@@ -640,19 +829,19 @@ fun FloatingOverlayHud(
                                         e.printStackTrace()
                                     }
                                 }
-                                .padding(8.dp)
+                                .padding(6.dp)
                         ) {
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_search),
                                 contentDescription = "Browser",
                                 tint = JarvisPrimary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text("BUSCADOR", fontSize = 8.sp, fontFamily = FontFamily.Monospace, color = JarvisTextSecondary)
                         }
 
-                        // Maps trigger
+                        // Maps
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
@@ -667,19 +856,19 @@ fun FloatingOverlayHud(
                                         e.printStackTrace()
                                     }
                                 }
-                                .padding(8.dp)
+                                .padding(6.dp)
                         ) {
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_compass),
                                 contentDescription = "Maps",
                                 tint = JarvisAccentCyan,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text("MAPAS", fontSize = 8.sp, fontFamily = FontFamily.Monospace, color = JarvisTextSecondary)
                         }
 
-                        // Device Settings trigger
+                        // Settings
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
@@ -694,33 +883,33 @@ fun FloatingOverlayHud(
                                         e.printStackTrace()
                                     }
                                 }
-                                .padding(8.dp)
+                                .padding(6.dp)
                         ) {
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_preferences),
                                 contentDescription = "Settings",
                                 tint = JarvisTextPrimary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text("AJUSTES", fontSize = 8.sp, fontFamily = FontFamily.Monospace, color = JarvisTextSecondary)
                         }
 
-                        // Dashboard trigger
+                        // Dashboard App
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { onOpenFullApp() }
-                                .padding(8.dp)
+                                .padding(6.dp)
                         ) {
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_gallery),
                                 contentDescription = "App",
                                 tint = JarvisAccentGreen,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text("SISTEMA", fontSize = 8.sp, fontFamily = FontFamily.Monospace, color = JarvisTextSecondary)
                         }
                     }
@@ -731,9 +920,9 @@ fun FloatingOverlayHud(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 180.dp)
+                            .heightIn(max = 190.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(JarvisBackground.copy(alpha = 0.9f))
+                            .background(JarvisBackground.copy(alpha = 0.94f))
                             .border(1.dp, JarvisBorder, RoundedCornerShape(14.dp))
                             .padding(12.dp)
                             .verticalScroll(rememberScrollState())
@@ -768,13 +957,14 @@ fun FloatingOverlayHud(
                                     )
                                 }
                             } else {
-                                HolographicTypewriterText(
-                                    text = lastResponse,
+                                SimpleMarkdownText(
+                                    content = lastResponse,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
 
-                            if (isSpeaking) {
+                            // Response action bar (Copy response + Stop voice)
+                            if (lastResponse.isNotBlank()) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -782,30 +972,64 @@ fun FloatingOverlayHud(
                                     horizontalArrangement = Arrangement.End,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    // Copy to clipboard button
                                     Surface(
-                                        onClick = onStopTts,
+                                        onClick = {
+                                            clipboardManager.setText(AnnotatedString(lastResponse))
+                                            isCopied = true
+                                        },
                                         shape = RoundedCornerShape(8.dp),
-                                        color = JarvisAccentRed.copy(alpha = 0.25f),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentRed)
+                                        color = JarvisSurfaceVariant,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, JarvisBorder)
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(6.dp)
-                                                    .clip(CircleShape)
-                                                    .background(JarvisAccentRed)
+                                            Icon(
+                                                imageVector = if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                                contentDescription = "Copiar",
+                                                tint = if (isCopied) JarvisAccentGreen else JarvisTextSecondary,
+                                                modifier = Modifier.size(13.dp)
                                             )
                                             Text(
-                                                text = "DETENER VOZ",
-                                                color = JarvisAccentRed,
+                                                text = if (isCopied) "COPIADO" else "COPIAR",
+                                                color = if (isCopied) JarvisAccentGreen else JarvisTextSecondary,
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 fontFamily = FontFamily.Monospace
                                             )
+                                        }
+                                    }
+
+                                    if (isSpeaking) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            onClick = onStopTts,
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = JarvisAccentRed.copy(alpha = 0.22f),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentRed)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(6.dp)
+                                                        .clip(CircleShape)
+                                                        .background(JarvisAccentRed)
+                                                )
+                                                Text(
+                                                    text = "DETENER VOZ",
+                                                    color = JarvisAccentRed,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -814,7 +1038,7 @@ fun FloatingOverlayHud(
                     }
                 }
 
-                // Quick Suggestion Chips (New Feature!)
+                // Quick Suggestion Chips
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -825,6 +1049,7 @@ fun FloatingOverlayHud(
                         "Resumir pantalla",
                         "Estado de batería",
                         "Reproducir música",
+                        "Alternar linterna",
                         "¿Qué hora es?",
                         "Abrir navegador"
                     )
@@ -837,10 +1062,10 @@ fun FloatingOverlayHud(
                         ) {
                             Text(
                                 text = "✨ $suggestion",
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontFamily = FontFamily.Monospace,
                                 color = JarvisTextSecondary,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                             )
                         }
                     }
@@ -861,6 +1086,21 @@ fun FloatingOverlayHud(
                                 color = JarvisTextSecondary,
                                 fontSize = 11.5.sp
                             )
+                        },
+                        trailingIcon = {
+                            if (inputText.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { inputText = "" },
+                                    modifier = Modifier.size(20.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Borrar",
+                                        tint = JarvisTextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -901,7 +1141,7 @@ fun FloatingOverlayHud(
                 }
             }
 
-            // Laser scanner screen scan overlay overlaying everything
+            // Laser scanner screen scan overlay
             if (isScanningScreen) {
                 val scanTransition = rememberInfiniteTransition(label = "laser_scan")
                 val scanProgress by scanTransition.animateFloat(
@@ -917,13 +1157,12 @@ fun FloatingOverlayHud(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(Color(0x2800E5FF)), // holographic cian tint
+                        .background(Color(0x2800E5FF)),
                     contentAlignment = Alignment.Center
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val y = scanProgress * size.height
 
-                        // Glowing sweep trailing gradient
                         drawRect(
                             brush = Brush.verticalGradient(
                                 colors = listOf(
@@ -939,7 +1178,6 @@ fun FloatingOverlayHud(
                             size = androidx.compose.ui.geometry.Size(size.width, 75f)
                         )
 
-                        // Laser line
                         drawLine(
                             color = Color(0xFF00E5FF),
                             start = Offset(0f, y),
@@ -948,7 +1186,6 @@ fun FloatingOverlayHud(
                         )
                     }
 
-                    // Tactile labels
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
