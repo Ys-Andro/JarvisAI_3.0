@@ -7,7 +7,6 @@
     android:padding="12dp"
     android:background="@drawable/bg_jarvis_widget">
 
-    <!-- Header: Arc Reactor + Brand Title + Status -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -63,7 +62,6 @@
             android:fontFamily="monospace" />
     </LinearLayout>
 
-    <!-- Quick Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -71,7 +69,6 @@
         android:orientation="horizontal"
         android:gravity="center">
 
-        <!-- Voice Live Button -->
         <LinearLayout
             android:id="@+id/btn_widget_voice"
             android:layout_width="0dp"
@@ -83,13 +80,11 @@
             android:background="@drawable/bg_widget_button"
             android:clickable="true"
             android:focusable="true">
-
             <ImageView
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_widget_mic"
                 android:contentDescription="Hablar con Jarvis" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -101,7 +96,6 @@
                 android:fontFamily="monospace" />
         </LinearLayout>
 
-        <!-- Open Chat Button -->
         <LinearLayout
             android:id="@+id/btn_widget_chat"
             android:layout_width="0dp"
@@ -113,13 +107,11 @@
             android:background="@drawable/bg_widget_button"
             android:clickable="true"
             android:focusable="true">
-
             <ImageView
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_widget_chat"
                 android:contentDescription="Abrir Chat" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -131,37 +123,6 @@
                 android:fontFamily="monospace" />
         </LinearLayout>
 
-        <!-- Toggle Bubble Button -->
-        <LinearLayout
-            android:id="@+id/btn_widget_bubble"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:layout_marginHorizontal="3dp"
-            android:background="@drawable/bg_widget_button"
-            android:clickable="true"
-            android:focusable="true">
-
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_widget_bubble"
-                android:contentDescription="Burbuja Flotante" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Burbuja"
-                android:textColor="#E0F7FA"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace" />
-        </LinearLayout>
-
-        <!-- Quick Torch / Action Button -->
         <LinearLayout
             android:id="@+id/btn_widget_torch"
             android:layout_width="0dp"
@@ -173,13 +134,11 @@
             android:background="@drawable/bg_widget_button"
             android:clickable="true"
             android:focusable="true">
-
             <ImageView
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_widget_torch"
                 android:contentDescription="Linterna Rápida" />
-
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -191,5 +150,4 @@
                 android:fontFamily="monospace" />
         </LinearLayout>
     </LinearLayout>
-
 </LinearLayout>
