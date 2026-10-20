@@ -9,7 +9,6 @@ import android.content.Intent
 import android.widget.RemoteViews
 import com.example.MainActivity
 import com.example.R
-import com.example.jarvisai.data.service.JarvisFloatingBubbleService
 import com.example.jarvisai.data.util.DeviceController
 
 class JarvisAppWidgetProvider : AppWidgetProvider() {
@@ -23,18 +22,6 @@ class JarvisAppWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         when (intent.action) {
-            ACTION_TOGGLE_BUBBLE -> {
-                if (DeviceController.canDrawOverlays(context)) {
-                    if (JarvisFloatingBubbleService.isServiceRunning) {
-                        JarvisFloatingBubbleService.stop(context)
-                    } else {
-                        JarvisFloatingBubbleService.start(context)
-                    }
-                } else {
-                    DeviceController.openOverlaySettings(context)
-                }
-                refreshAllWidgets(context)
-            }
             ACTION_TOGGLE_TORCH -> {
                 isTorchActive = !isTorchActive
                 DeviceController.executeActionCommand(
@@ -47,25 +34,15 @@ class JarvisAppWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        const val ACTION_TOGGLE_BUBBLE = "com.example.jarvisai.ACTION_TOGGLE_BUBBLE"
         const val ACTION_TOGGLE_TORCH = "com.example.jarvisai.ACTION_TOGGLE_TORCH"
 
         private var isTorchActive = false
 
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val views = RemoteViews(context.packageName, R.layout.jarvis_app_widget)
+            views.setTextViewText(R.id.widget_status, "ONLINE")
+            views.setTextColor(R.id.widget_status, 0xFF00E676.toInt())
 
-            // Dynamic status feedback
-            val isBubbleRunning = JarvisFloatingBubbleService.isServiceRunning
-            if (isBubbleRunning) {
-                views.setTextViewText(R.id.widget_status, "BURBUJA ON")
-                views.setTextColor(R.id.widget_status, 0xFF00E5FF.toInt())
-            } else {
-                views.setTextViewText(R.id.widget_status, "ONLINE")
-                views.setTextColor(R.id.widget_status, 0xFF00E676.toInt())
-            }
-
-            // 1. Voice Intent (opens live mode or voice prompt in MainActivity)
             val voiceIntent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VOICE_COMMAND
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -79,7 +56,6 @@ class JarvisAppWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.btn_widget_voice, voicePendingIntent)
 
-            // 2. Chat Intent (opens main chat in MainActivity)
             val chatIntent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_MAIN
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -92,19 +68,6 @@ class JarvisAppWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.btn_widget_chat, chatPendingIntent)
 
-            // 3. Floating Bubble Toggle Broadcast Intent
-            val bubbleIntent = Intent(context, JarvisAppWidgetProvider::class.java).apply {
-                action = ACTION_TOGGLE_BUBBLE
-            }
-            val bubblePendingIntent = PendingIntent.getBroadcast(
-                context,
-                103,
-                bubbleIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.btn_widget_bubble, bubblePendingIntent)
-
-            // 4. Quick Torch Broadcast Intent
             val torchIntent = Intent(context, JarvisAppWidgetProvider::class.java).apply {
                 action = ACTION_TOGGLE_TORCH
             }
