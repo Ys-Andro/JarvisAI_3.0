@@ -111,7 +111,13 @@ data class AgentContextSnapshot(
             append("\n[RECENT CONVERSATION]\n")
             conversation.forEach { message ->
                 val role = message.role.name
-                append("$role: ").append(message.content.take(1200)).append("\n")
+                val cleaned = message.content
+                    .replace(Regex("\\[JARVIS_ACTION:\\s*\\{[\\s\\S]*?\\}\\]"), "")
+                    .replace(Regex("```(?:json)?\\s*\\{[\\s\\S]*?\"action\"[\\s\\S]*?\\}\\s*```"), "")
+                    .trim()
+                if (cleaned.isNotBlank()) {
+                    append("$role: ").append(cleaned.take(1200)).append("\n")
+                }
             }
         }
 

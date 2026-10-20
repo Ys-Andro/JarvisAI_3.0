@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SmartToy
@@ -48,6 +49,7 @@ import com.example.jarvisai.ui.theme.JarvisTextSecondary
 
 enum class SettingsCategory(val title: String, val code: String, val icon: ImageVector) {
     ALL("Módulos", "MOD_ALL", Icons.Default.AllInclusive),
+    USER_PROFILE("Perfil Usuario", "MOD_USER", Icons.Default.Person),
     MODELS_API("Modelos IA", "MOD_LLM", Icons.Default.Key),
     VOICE("Voz & Hotword", "MOD_VOICE", Icons.Default.RecordVoiceOver),
     DEVICE_CONTROL("Dispositivo", "MOD_SYS", Icons.Default.Smartphone),

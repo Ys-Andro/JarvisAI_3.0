@@ -2,11 +2,14 @@ package com.example.jarvisai.domain.repository
 
 import com.example.jarvisai.domain.model.AppThemeMode
 import com.example.jarvisai.domain.model.GenerationSettings
+import com.example.jarvisai.domain.model.UserProfile
 import kotlinx.coroutines.flow.Flow
 
 interface ISettingsRepository {
     fun getSettings(): Flow<GenerationSettings>
     suspend fun updateSettings(settings: GenerationSettings)
+    fun getUserProfile(): Flow<UserProfile>
+    suspend fun updateUserProfile(profile: UserProfile)
     fun getApiKey(): Flow<String?>
     suspend fun updateApiKey(apiKey: String)
     fun getProviderApiKey(providerId: String): Flow<String?>

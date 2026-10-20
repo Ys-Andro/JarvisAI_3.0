@@ -28,6 +28,7 @@ data class ChatUiState(
     val totalDocumentsLearned: Int = 0,
     val totalMemoriesCount: Int = 0,
     val settings: com.example.jarvisai.domain.model.GenerationSettings = com.example.jarvisai.domain.model.GenerationSettings(),
+    val userProfile: com.example.jarvisai.domain.model.UserProfile = com.example.jarvisai.domain.model.UserProfile(),
     val pendingActionConfirmation: com.example.jarvisai.data.action.ActionRequest? = null,
     val pendingActionJson: String? = null,
     val errorMessage: String? = null

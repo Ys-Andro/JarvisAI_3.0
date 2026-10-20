@@ -104,6 +104,31 @@ class ModelsViewModel(
         observeProviderApiKeys()
         observeSelectedAgent()
         observeHotwordSettings()
+        observeUserProfile()
+    }
+
+    private fun observeUserProfile() {
+        viewModelScope.launch {
+            settingsRepository.getUserProfile().collect { profile ->
+                _uiState.update { it.copy(userProfile = profile) }
+            }
+        }
+    }
+
+    fun updateUserProfile(profile: com.example.jarvisai.domain.model.UserProfile) {
+        viewModelScope.launch {
+            try {
+                settingsRepository.updateUserProfile(profile)
+                _uiState.update { 
+                    it.copy(
+                        userProfile = profile,
+                        statusMessage = "Perfil personal sincronizado. Jarvis adaptará su trato a ti."
+                    ) 
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error al guardar perfil: ${e.message}") }
+            }
+        }
     }
 
     private fun observeHotwordSettings() {

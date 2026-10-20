@@ -121,8 +121,17 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
         return newId
     }
 
+    private fun sanitizeText(text: String): String {
+        return text
+            .replace(Regex("\\[JARVIS_ACTION:\\s*\\{[\\s\\S]*?\\}\\]"), "")
+            .replace(Regex("```(?:json)?\\s*\\{[\\s\\S]*?\"action\"[\\s\\S]*?\\}\\s*```"), "")
+            .replace(Regex("\\n{3,}"), "\n\n")
+            .trim()
+    }
+
     private fun saveMessageToDatabase(role: Role, content: String) {
-        if (content.isBlank()) return
+        val cleanContent = if (role == Role.ASSISTANT) sanitizeText(content) else content.trim()
+        if (cleanContent.isBlank()) return
         serviceScope.launch {
             try {
                 val convId = getOrCreateBubbleConversationId()
@@ -130,7 +139,7 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
                     id = UUID.randomUUID().toString(),
                     conversationId = convId,
                     role = role,
-                    content = content,
+                    content = cleanContent,
                     timestamp = System.currentTimeMillis()
                 )
                 appContainer.conversationRepository.insertMessage(message)
@@ -382,8 +391,10 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
                     lastResponse = fullResponse.toString()
                 }
                 isThinking = false
-                saveMessageToDatabase(Role.ASSISTANT, fullResponse.toString())
-                fullResponse.toString()
+                val cleanResponse = sanitizeText(fullResponse.toString())
+                lastResponse = cleanResponse
+                saveMessageToDatabase(Role.ASSISTANT, cleanResponse)
+                cleanResponse
             } catch (e: Exception) {
                 isThinking = false
                 val errorMsg = "Error: ${e.message}"
@@ -471,12 +482,14 @@ class JarvisFloatingBubbleService : LifecycleService(), SavedStateRegistryOwner,
 
                 isThinking = false
                 statusText = "Respuesta lista"
-                saveMessageToDatabase(Role.ASSISTANT, fullResponse.toString())
+                val cleanResponse = sanitizeText(fullResponse.toString())
+                lastResponse = cleanResponse
+                saveMessageToDatabase(Role.ASSISTANT, cleanResponse)
 
                 // Auto speak response if enabled
                 if (settings.autoTts) {
                     appContainer.ttsRepository.speak(
-                        text = fullResponse.toString(),
+                        text = cleanResponse,
                         pitch = settings.ttsPitch,
                         speed = settings.ttsSpeed
                     )

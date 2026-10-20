@@ -13,6 +13,9 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.jarvisai.data.security.SecureSecretStore
 import com.example.jarvisai.domain.model.AppThemeMode
 import com.example.jarvisai.domain.model.GenerationSettings
+import com.example.jarvisai.domain.model.UserProfile
+import com.example.jarvisai.domain.model.AddressingStyle
+import com.example.jarvisai.domain.model.PersonalityTone
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -52,6 +55,15 @@ class AppPreferences(private val context: Context) {
         val SELECTED_AGENT_ID = stringPreferencesKey("selected_agent_id")
         val HOTWORD_SENSITIVITY = stringPreferencesKey("hotword_sensitivity") // "LOW", "MEDIUM", "HIGH"
         val HOTWORD_AUTO_LAUNCH_APP = booleanPreferencesKey("hotword_auto_launch_app")
+        val USER_NAME = stringPreferencesKey("user_profile_name")
+        val USER_NICKNAME = stringPreferencesKey("user_profile_nickname")
+        val USER_ADDRESSING_STYLE = stringPreferencesKey("user_profile_addressing_style")
+        val USER_PERSONALITY_TONE = stringPreferencesKey("user_profile_personality_tone")
+        val USER_PROFESSION = stringPreferencesKey("user_profile_profession")
+        val USER_INTERESTS = stringPreferencesKey("user_profile_interests")
+        val USER_CURRENT_GOALS = stringPreferencesKey("user_profile_current_goals")
+        val USER_KEY_FACTS = stringPreferencesKey("user_profile_key_facts")
+        val USER_CUSTOM_INSTRUCTIONS = stringPreferencesKey("user_profile_custom_instructions")
     }
 
     private val safePreferences: Flow<Preferences> = dataStore.data
@@ -249,6 +261,36 @@ class AppPreferences(private val context: Context) {
     suspend fun setHotwordAutoLaunchApp(enable: Boolean) {
         dataStore.edit { preferences ->
             preferences[Keys.HOTWORD_AUTO_LAUNCH_APP] = enable
+        }
+    }
+
+    val userProfile: Flow<UserProfile> = safePreferences.map { preferences ->
+        val rawStyle = preferences[Keys.USER_ADDRESSING_STYLE] ?: AddressingStyle.SIR_JARVIS.id
+        val rawTone = preferences[Keys.USER_PERSONALITY_TONE] ?: PersonalityTone.LOYAL_BUTLER.id
+        UserProfile(
+            name = preferences[Keys.USER_NAME] ?: "",
+            nickname = preferences[Keys.USER_NICKNAME] ?: "",
+            addressingStyle = AddressingStyle.fromId(rawStyle),
+            personalityTone = PersonalityTone.fromId(rawTone),
+            profession = preferences[Keys.USER_PROFESSION] ?: "",
+            interests = preferences[Keys.USER_INTERESTS] ?: "",
+            currentGoals = preferences[Keys.USER_CURRENT_GOALS] ?: "",
+            keyFacts = preferences[Keys.USER_KEY_FACTS] ?: "",
+            customInstructions = preferences[Keys.USER_CUSTOM_INSTRUCTIONS] ?: ""
+        )
+    }
+
+    suspend fun updateUserProfile(profile: UserProfile) {
+        dataStore.edit { preferences ->
+            preferences[Keys.USER_NAME] = profile.name
+            preferences[Keys.USER_NICKNAME] = profile.nickname
+            preferences[Keys.USER_ADDRESSING_STYLE] = profile.addressingStyle.id
+            preferences[Keys.USER_PERSONALITY_TONE] = profile.personalityTone.id
+            preferences[Keys.USER_PROFESSION] = profile.profession
+            preferences[Keys.USER_INTERESTS] = profile.interests
+            preferences[Keys.USER_CURRENT_GOALS] = profile.currentGoals
+            preferences[Keys.USER_KEY_FACTS] = profile.keyFacts
+            preferences[Keys.USER_CUSTOM_INSTRUCTIONS] = profile.customInstructions
         }
     }
 }

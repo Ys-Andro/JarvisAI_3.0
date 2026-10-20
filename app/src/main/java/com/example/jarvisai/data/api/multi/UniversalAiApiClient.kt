@@ -29,6 +29,18 @@ class UniversalAiApiClient(
 ) {
     companion object {
         private const val TAG = "UniversalAiClient"
+
+        fun cleanHistoryContent(content: String): String {
+            return content
+                .replace(Regex("\\[JARVIS_ACTION:\\s*\\{[\\s\\S]*?\\}\\]"), "")
+                .replace(Regex("```(?:json)?\\s*\\{[\\s\\S]*?\"action\"[\\s\\S]*?\\}\\s*```"), "")
+                .replace(Regex("(?m)^\\s*✓\\s*.*$", RegexOption.MULTILINE), "")
+                .replace(Regex("(?m)^\\s*⚠️\\s*.*$", RegexOption.MULTILINE), "")
+                .replace(Regex("(?m)^\\s*🚫\\s*.*$", RegexOption.MULTILINE), "")
+                .replace(Regex("(?m)^\\s*🔒\\s*.*$", RegexOption.MULTILINE), "")
+                .replace(Regex("\\n{3,}"), "\n\n")
+                .trim()
+        }
     }
 
     /**
@@ -49,11 +61,14 @@ class UniversalAiApiClient(
     ): Flow<String> {
         return when (model.provider) {
             ModelProvider.GEMINI -> {
-                val geminiHistory = history.filter { it.content.isNotBlank() }.map { msg ->
-                    GeminiMessage(
-                        role = if (msg.role == Role.USER) "user" else "model",
-                        text = msg.content
-                    )
+                val geminiHistory = history.mapNotNull { msg ->
+                    val cleanText = cleanHistoryContent(msg.content)
+                    if (cleanText.isNotBlank()) {
+                        GeminiMessage(
+                            role = if (msg.role == Role.USER) "user" else "model",
+                            text = cleanText
+                        )
+                    } else null
                 }
                 val inlineData = if (!imageBase64.isNullOrBlank()) {
                     com.example.jarvisai.data.api.gemini.GeminiInlineData(
@@ -129,10 +144,11 @@ class UniversalAiApiClient(
 
             // History
             for (msg in history) {
-                if (msg.content.isBlank()) continue
+                val clean = cleanHistoryContent(msg.content)
+                if (clean.isBlank()) continue
                 messagesArray.put(JSONObject().apply {
                     put("role", if (msg.role == Role.USER) "user" else "assistant")
-                    put("content", msg.content)
+                    put("content", clean)
                 })
             }
 
@@ -265,10 +281,11 @@ class UniversalAiApiClient(
 
             val messagesArray = JSONArray()
             for (msg in history) {
-                if (msg.content.isBlank()) continue
+                val clean = cleanHistoryContent(msg.content)
+                if (clean.isBlank()) continue
                 messagesArray.put(JSONObject().apply {
                     put("role", if (msg.role == Role.USER) "user" else "assistant")
-                    put("content", msg.content)
+                    put("content", clean)
                 })
             }
             messagesArray.put(JSONObject().apply {

@@ -69,15 +69,29 @@ class JarvisMorningBriefingWorker(
             val docsCount = db.documentDao().getAllDocuments().first().size
             val batteryLevel = getBatteryLevel(context)
 
+            val prefs = com.example.jarvisai.data.local.datastore.AppPreferences(context)
+            val userProfile = prefs.userProfile.first()
+            val callSign = userProfile.preferredCallSign
+
             val greeting = getDayPeriodGreeting()
             val memorySnippet = if (memories.isNotEmpty()) {
                 val sample = memories.shuffled().first()
                 "Recuerde: \"${sample.key} - ${sample.value}\""
+            } else if (userProfile.currentGoals.isNotBlank()) {
+                "Meta del día: \"${userProfile.currentGoals.take(60)}\""
             } else {
                 "Núcleo de conocimientos sincronizado con $docsCount documentos."
             }
 
-            val briefingText = "$greeting, señor. Batería al $batteryLevel%. $memorySnippet Estoy listo para sus órdenes."
+            val briefingText = when (userProfile.addressingStyle) {
+                com.example.jarvisai.domain.model.AddressingStyle.CASUAL,
+                com.example.jarvisai.domain.model.AddressingStyle.BROTHER_SLANG ->
+                    "$greeting $callSign. Batería al $batteryLevel%. $memorySnippet ¡A romperla hoy!"
+                com.example.jarvisai.domain.model.AddressingStyle.DIRECT_EXECUTIVE ->
+                    "Informe: Batería $batteryLevel%. $memorySnippet Sistemas operativos."
+                else ->
+                    "$greeting, $callSign. Batería al $batteryLevel%. $memorySnippet Estoy a su entera disposición."
+            }
 
             showBriefingNotification(briefingText)
             Result.success()

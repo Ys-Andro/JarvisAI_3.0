@@ -98,14 +98,15 @@ class AgentOrchestrator(
             CURRENT_DATETIME consulta directamente el reloj del dispositivo y no requiere parámetros.
             Acciones Android disponibles: ${actionCatalog}
             Ejemplo: CURRENT_DATETIME -> obtener la hora y fecha reales del dispositivo.
-            Ejemplos: ACTION -> {"action":"OPEN_APP","appName":"WhatsApp"}
+            Ejemplos: ACTION -> {"action":"FLASHLIGHT","enable":true}
             ACTION -> {"action":"VOLUME","level":40}
             ACTION -> {"action":"SET_TIMER","seconds":300,"message":"Temporizador"}
             ACTION -> {"action":"OPEN_URL","url":"https://example.com"}
             ACTION -> {"action":"SAVE_MEMORY","key":"clave","value":"dato","category":"GENERAL"}
 
             Reglas: devuelve solo JSON; no inventes herramientas; conserva el objetivo actual;
-            usa el contexto para resolver referencias; divide solicitudes complejas en pasos;
+            NUNCA repitas acciones pasadas de turnos anteriores salvo que el usuario lo pida expresamente en su objetivo actual;
+            si el objetivo actual es una conversación o pregunta informativa sin necesidad de herramientas, devuelve siempre NO_TOOL;
             usa dependencies cuando corresponda; no repitas una acción ya completada si el
             usuario pide continuar con otra entidad.
 

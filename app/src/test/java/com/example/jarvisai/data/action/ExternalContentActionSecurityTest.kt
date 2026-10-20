@@ -265,4 +265,50 @@ class ExternalContentActionSecurityTest {
             results.any { it.contains("✓") }
         )
     }
+
+    @Test
+    fun `ActionParser ignores unsolicited app opening when user prompt is unrelated`() = runBlocking {
+        val unsolicitedResponse = """
+            Hola, ¿en qué puedo ayudarte hoy?
+            [JARVIS_ACTION: {"action":"OPEN_APP","appName":"whatsapp"}]
+        """.trimIndent()
+
+        val results = mutableListOf<String>()
+
+        actionParser.extractAndExecute(
+            responseText = unsolicitedResponse,
+            executor = executor,
+            hasExternalContent = false,
+            userPrompt = "Hola cómo estás",
+            onResult = { res -> results.add(res) }
+        )
+
+        assertTrue(
+            "No debe ejecutarse OPEN_APP si el mensaje del usuario no solicita abrir ninguna aplicación",
+            results.isEmpty()
+        )
+    }
+
+    @Test
+    fun `ActionParser executes app opening when user prompt explicitly asks to open app`() = runBlocking {
+        val intentionalResponse = """
+            Abriendo WhatsApp para ti.
+            [JARVIS_ACTION: {"action":"OPEN_APP","appName":"whatsapp"}]
+        """.trimIndent()
+
+        val results = mutableListOf<String>()
+
+        actionParser.extractAndExecute(
+            responseText = intentionalResponse,
+            executor = executor,
+            hasExternalContent = false,
+            userPrompt = "Por favor abre WhatsApp",
+            onResult = { res -> results.add(res) }
+        )
+
+        assertTrue(
+            "Debe procesar OPEN_APP si el mensaje del usuario solicita explícitamente abrir WhatsApp",
+            results.isNotEmpty()
+        )
+    }
 }

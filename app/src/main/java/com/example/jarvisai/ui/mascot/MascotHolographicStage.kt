@@ -97,6 +97,7 @@ fun MascotHolographicStage(
     modifier: Modifier = Modifier,
     mascotSize: Dp = 190.dp,
     state: MascotState = MascotState.IDLE,
+    userCallSign: String? = null,
     onLiveModeClick: () -> Unit = {},
     onDeviceControlClick: () -> Unit = {},
     onQuickPromptClick: (String, Boolean) -> Unit = { _, _ -> }
@@ -116,7 +117,14 @@ fun MascotHolographicStage(
         }
     }
 
-    val currentQuote = remember(quoteIndex) { QUOTES[quoteIndex % QUOTES.size] }
+    val currentQuote = remember(quoteIndex, userCallSign) {
+        val rawQuote = QUOTES[quoteIndex % QUOTES.size]
+        if (!userCallSign.isNullOrBlank()) {
+            rawQuote.replace("señor", userCallSign)
+        } else {
+            rawQuote
+        }
+    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "hologram_stage_anim")
 

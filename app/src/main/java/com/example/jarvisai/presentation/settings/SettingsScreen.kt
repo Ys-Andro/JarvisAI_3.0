@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SmartToy
@@ -83,6 +84,7 @@ import com.example.jarvisai.presentation.settings.components.SettingsCategory
 import com.example.jarvisai.presentation.settings.components.SettingsCategoryTabs
 import com.example.jarvisai.presentation.settings.components.SettingsHeader
 import com.example.jarvisai.presentation.settings.components.SettingsSectionCard
+import com.example.jarvisai.presentation.settings.components.UserProfileSection
 import com.example.jarvisai.presentation.settings.components.VoiceSettingsSection
 import com.example.jarvisai.ui.theme.JarvisAccentCyan
 import com.example.jarvisai.ui.theme.JarvisAccentGold
@@ -116,6 +118,7 @@ fun SettingsScreen(
 
     var selectedCategory by remember { mutableStateOf(SettingsCategory.ALL) }
 
+    var isUserProfileExpanded by remember { mutableStateOf(true) }
     var isDeviceControlExpanded by remember { mutableStateOf(false) }
     var isApiKeysExpanded by remember { mutableStateOf(false) }
     var isAgentExpanded by remember { mutableStateOf(false) }
@@ -184,6 +187,29 @@ fun SettingsScreen(
                             }
                         }
                     )
+                }
+
+                // Section: User Profile & Personal Information (Perfil y Trato Personal)
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.USER_PROFILE) {
+                    item {
+                        val profileName = uiState.userProfile.effectiveDisplayName
+                        SettingsSectionCard(
+                            title = "PERFIL DE USUARIO Y TRATO PERSONAL",
+                            subtitle = "Tu información clave, cómo llamarte y cómo debe tratarte Jarvis",
+                            icon = Icons.Default.Person,
+                            badgeText = if (uiState.userProfile.isConfigured) profileName.uppercase() else "PERSONALIZAR",
+                            badgeColor = if (uiState.userProfile.isConfigured) JarvisAccentGreen else JarvisAccentGold,
+                            isExpanded = isUserProfileExpanded,
+                            onToggleExpand = { isUserProfileExpanded = !isUserProfileExpanded }
+                        ) {
+                            UserProfileSection(
+                                userProfile = uiState.userProfile,
+                                onSaveProfile = { newProfile ->
+                                    viewModel.updateUserProfile(newProfile)
+                                }
+                            )
+                        }
+                    }
                 }
 
                 // Section: Device Control & Hardware Automation

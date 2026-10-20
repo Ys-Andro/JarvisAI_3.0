@@ -155,17 +155,18 @@ class ChatViewModel(
             }
 
             val result = responseBuilder.toString()
+            val sanitizedResult = sanitizeAssistantResponse(result)
             val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(1L)
             val tokPerSec = (tokenCount.toFloat() / (elapsedMs.toFloat() / 1000f))
 
             conversationRepository.updateMessageContent(
                 messageId = assistantMsgId,
-                content = result,
+                content = sanitizedResult,
                 tokensPerSec = tokPerSec,
                 durationMs = elapsedMs
             )
 
-            result.ifBlank { "Procesado correctamente." }
+            sanitizedResult.ifBlank { "Procesado correctamente." }
         } catch (e: Exception) {
             "Entendido. Hubo un detalle al procesar: ${e.message}"
         }
@@ -175,6 +176,11 @@ class ChatViewModel(
         viewModelScope.launch {
             settingsRepository.getSettings().collect { currentSettings ->
                 _uiState.update { it.copy(settings = currentSettings) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.getUserProfile().collect { profile ->
+                _uiState.update { it.copy(userProfile = profile) }
             }
         }
     }
@@ -507,10 +513,25 @@ class ChatViewModel(
     }
 
     private fun shouldUseAgent(prompt: String): Boolean {
-        val normalized = prompt.lowercase()
-        val actionSignals = listOf("abre ", "abrir ", "cierra ", "cerrar ", "pon ", "poner ", "activa ", "activar ", "desactiva ", "enciende ", "apaga ", "llama ", "llamar ", "manda ", "enviar ", "envía ", "navega ", "buscar ", "busca ", "reproduce ", "reproducir ", "crea una alarma", "pon una alarma", "temporizador", "toma una captura", "lee la pantalla", "guarda en memoria", "recuerda ", "recuérdame", "programa ", "programar ", "cada día", "cada semana", "cada lunes", "en 10 minutos", "en una hora", "ejecuta ")
-        val multiStepSignals = listOf(" y luego ", " después ", " luego ", "y también", "primero ", "ahora hazlo", "ahora haz lo mismo", "haz lo mismo", "lo mismo", "el segundo", "el anterior", "esa configuración", "eso", "esa acción", "aquello")
-        return actionSignals.any(normalized::contains) || multiStepSignals.any(normalized::contains)
+        val normalized = prompt.trim().lowercase()
+        if (normalized.length < 3) return false
+        val actionSignals = listOf(
+            "abre ", "abrir ", "cierra ", "cerrar ", "pon ", "poner ", "activa ", "activar ",
+            "desactiva ", "enciende ", "apaga ", "llama ", "llamar ", "manda ", "enviar ",
+            "envía ", "navega ", "buscar ", "busca ", "reproduce ", "reproducir ",
+            "crea una alarma", "pon una alarma", "temporizador", "toma una captura",
+            "lee la pantalla", "guarda en memoria", "recuerda ", "recuérdame", "programa ",
+            "programar ", "cada día", "cada semana", "en 10 minutos", "en una hora", "ejecuta "
+        )
+        val hasDirectAction = actionSignals.any { normalized.startsWith(it) || normalized.contains(" $it") }
+
+        val multiStepFollowUps = listOf(
+            "ahora haz lo mismo", "haz lo mismo", "haz lo anterior", "haz aquello",
+            "repite la acción", "repite lo mismo", "ejecuta lo anterior"
+        )
+        val hasFollowUp = multiStepFollowUps.any { normalized.contains(it) }
+
+        return hasDirectAction || hasFollowUp
     }
 
     private fun executeAgentGoal(
@@ -532,10 +553,11 @@ class ChatViewModel(
                     imageBase64 = imageBase64,
                     imageMimeType = imageMimeType
                 )
-                conversationRepository.updateMessageContent(assistantMsgId, result, 0f, System.currentTimeMillis() - startTime)
+                val sanitized = sanitizeAssistantResponse(result)
+                conversationRepository.updateMessageContent(assistantMsgId, sanitized, 0f, System.currentTimeMillis() - startTime)
                 _uiState.update { it.copy(streamingMessageId = null, tokensPerSecond = 0f) }
                 checkAndTriggerPendingAction(result)
-                if (settings.autoTts && result.isNotBlank()) speakText(result)
+                if (settings.autoTts && sanitized.isNotBlank()) speakText(sanitized)
             } catch (e: Exception) {
                 val message = "No pude completar la tarea agéntica: ${e.message ?: "error desconocido"}"
                 conversationRepository.updateMessageContent(assistantMsgId, message, 0f, 0L)
@@ -809,6 +831,7 @@ class ChatViewModel(
     private fun sanitizeAssistantResponse(text: String): String {
         return text
             .replace(Regex("\\[JARVIS_ACTION:\\s*\\{[\\s\\S]*?\\}\\]"), "")
+            .replace(Regex("```(?:json)?\\s*\\{[\\s\\S]*?\"action\"[\\s\\S]*?\\}\\s*```"), "")
             .replace(Regex("\\n{3,}"), "\\n\\n")
             .trim()
     }
@@ -844,8 +867,14 @@ class ChatViewModel(
 
     fun testLiveVoice(pitch: Float, speed: Float, voiceName: String) {
         viewModelScope.launch {
+            val userProfile = settingsRepository.getUserProfile().first()
+            val textToSpeak = if (userProfile.preferredCallSign.isNotBlank()) {
+                "Hola ${userProfile.preferredCallSign}, soy Jarvis. Tu sistema de inteligencia artificial en tiempo real."
+            } else {
+                "Hola, soy Jarvis. Tu sistema de inteligencia artificial en tiempo real."
+            }
             ttsRepository.speak(
-                text = "Hola, soy Jarvis. Tu sistema de inteligencia artificial en tiempo real.",
+                text = textToSpeak,
                 pitch = pitch,
                 speed = speed
             )

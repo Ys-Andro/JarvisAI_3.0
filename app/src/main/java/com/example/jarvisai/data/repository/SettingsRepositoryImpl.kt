@@ -3,6 +3,7 @@ package com.example.jarvisai.data.repository
 import com.example.jarvisai.data.local.datastore.AppPreferences
 import com.example.jarvisai.domain.model.AppThemeMode
 import com.example.jarvisai.domain.model.GenerationSettings
+import com.example.jarvisai.domain.model.UserProfile
 import com.example.jarvisai.domain.repository.ISettingsRepository
 import kotlinx.coroutines.flow.Flow
 
@@ -16,6 +17,14 @@ class SettingsRepositoryImpl(
 
     override suspend fun updateSettings(settings: GenerationSettings) {
         appPreferences.updateGenerationSettings(settings)
+    }
+
+    override fun getUserProfile(): Flow<UserProfile> {
+        return appPreferences.userProfile
+    }
+
+    override suspend fun updateUserProfile(profile: UserProfile) {
+        appPreferences.updateUserProfile(profile)
     }
 
     override fun getApiKey(): Flow<String?> {

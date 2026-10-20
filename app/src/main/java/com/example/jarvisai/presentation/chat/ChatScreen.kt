@@ -461,7 +461,8 @@ fun ChatScreen(
                         onOpenAgentPlanner = onNavigateToAgentPlanner,
                         onOpenMemory = onNavigateToMemory,
                         onOpenHistory = onNavigateToHistory,
-                        onQuickActionClick = viewModel::onQuickActionClick
+                        onQuickActionClick = viewModel::onQuickActionClick,
+                        userCallSign = uiState.userProfile.preferredCallSign
                     )
                 } else {
                     LazyColumn(
@@ -1065,6 +1066,7 @@ private fun EmptyChatPlaceholder(
     onOpenMemory: () -> Unit,
     onOpenHistory: () -> Unit,
     onQuickActionClick: (String, Boolean) -> Unit,
+    userCallSign: String? = null,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "orb_pulse")
@@ -1090,6 +1092,7 @@ private fun EmptyChatPlaceholder(
         MascotHolographicStage(
             mascotSize = 190.dp,
             state = MascotState.IDLE,
+            userCallSign = userCallSign,
             onLiveModeClick = onOpenLiveMode,
             onDeviceControlClick = onOpenDeviceControl,
             onQuickPromptClick = onQuickActionClick
