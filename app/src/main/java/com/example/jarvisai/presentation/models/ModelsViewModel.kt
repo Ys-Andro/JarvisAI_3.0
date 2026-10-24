@@ -164,7 +164,7 @@ class ModelsViewModel(
                     statusMessage = if (enable) 
                         "La app se abrirá al decir 'Oye Jarvis'." 
                     else 
-                        "Modo no intrusivo: sólo activará la burbuja/HUD flotante sin saltar a pantalla completa."
+                        "Modo no intrusivo: respuesta en segundo plano sin saltar a pantalla completa."
                 ) 
             }
         }

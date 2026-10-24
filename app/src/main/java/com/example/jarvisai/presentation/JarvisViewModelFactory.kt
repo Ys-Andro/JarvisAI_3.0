@@ -28,8 +28,10 @@ class JarvisViewModelFactory(
                     documentRepository = appContainer.documentRepository,
                     memoryRepository = appContainer.memoryRepository,
                     liveVoiceEngine = appContainer.liveVoiceEngine,
+                    visualContextProvider = appContainer.liveVisualContextProvider,
                     agentOrchestrator = appContainer.agentOrchestrator,
-                    actionExecutor = appContainer.actionExecutor
+                    actionExecutor = appContainer.actionExecutor,
+                    sessionManager = appContainer.sessionManager
                 ) as T
             }
             modelClass.isAssignableFrom(LibraryViewModel::class.java) -> {

@@ -10,14 +10,26 @@ interface ILiveVoiceEngine {
     /** Live observable state flow */
     val sessionState: StateFlow<LiveVoiceSessionState>
 
+    /** Observable state indicating if Live Mode session is actively running */
+    val isLiveModeActive: StateFlow<Boolean>
+
     /** Set or update the decoupled response provider function */
     fun setResponseProvider(provider: suspend (String) -> String)
+
+    /** Start the Live Mode session */
+    fun startLiveMode()
+
+    /** Finalize and stop the Live Mode session */
+    fun stopLiveMode()
 
     /** Start listening for user speech */
     fun startListening()
 
     /** Stop listening */
     fun stopListening()
+
+    /** Temporarily pause/resume listening without stopping Live Mode */
+    fun setPaused(paused: Boolean)
 
     /** Mute or unmute microphone */
     fun setMuted(muted: Boolean)

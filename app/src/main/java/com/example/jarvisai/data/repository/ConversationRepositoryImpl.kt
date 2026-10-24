@@ -37,8 +37,8 @@ class ConversationRepositoryImpl(
             .flowOn(dispatcher)
     }
 
-    override suspend fun createConversation(title: String, modelId: String?): String = withContext(dispatcher) {
-        val id = UUID.randomUUID().toString()
+    override suspend fun createConversation(title: String, modelId: String?, customId: String?): String = withContext(dispatcher) {
+        val id = if (!customId.isNullOrBlank()) customId else UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         val conversation = Conversation(
             id = id,

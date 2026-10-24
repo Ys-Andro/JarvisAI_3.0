@@ -27,7 +27,7 @@ import com.example.jarvisai.ui.theme.JarvisBackground
 class MainActivity : ComponentActivity() {
 
     private val appContainer by lazy {
-        AppContainer(applicationContext)
+        AppContainer.getInstance(applicationContext)
     }
 
     private val viewModelFactory by lazy {
@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleAssistIntent(intent)
+        checkLiveModeIntent(intent)
         AutomationBootstrap.restore(this, appContainer.automationDao, appContainer.automationScheduler)
 
         setContent {
@@ -85,20 +86,37 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleAssistIntent(intent)
+        checkLiveModeIntent(intent)
+    }
+
+    private fun checkLiveModeIntent(incomingIntent: android.content.Intent?) {
+        if (incomingIntent?.getBooleanExtra(com.example.jarvisai.data.service.JarvisLiveVoiceService.EXTRA_OPEN_LIVE_MODE, false) == true) {
+            chatViewModel.openLiveMode()
+        }
     }
 
     private fun handleAssistIntent(incomingIntent: android.content.Intent?) {
         val action = incomingIntent?.action
         if (action == android.content.Intent.ACTION_ASSIST || action == android.content.Intent.ACTION_VOICE_COMMAND) {
-            // Trigger floating bubble if permission is granted
-            if (android.provider.Settings.canDrawOverlays(this)) {
-                try {
-                    val serviceIntent = android.content.Intent(this, com.example.jarvisai.data.service.JarvisFloatingBubbleService::class.java)
-                    startService(serviceIntent)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
+            // Bring activity into foreground
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        com.example.jarvisai.data.service.JarvisLiveVoiceService.notifyActivityVisibility(true)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        com.example.jarvisai.data.service.JarvisLiveVoiceService.notifyActivityVisibility(false)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing && !appContainer.liveVoiceEngine.isLiveModeActive.value) {
+            appContainer.sessionManager.endSession()
+            appContainer.liveVisualContextProvider.disableVisualContext()
         }
     }
 }

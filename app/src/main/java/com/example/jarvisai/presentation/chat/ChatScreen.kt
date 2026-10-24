@@ -152,7 +152,6 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    var showLiveMode by remember { mutableStateOf(false) }
     var showMascotHud by remember { mutableStateOf(false) }
 
     // Speech-To-Text launcher
@@ -294,24 +293,21 @@ fun ChatScreen(
                         }
                         context.startActivity(Intent.createChooser(shareIntent, "Compartir conversación"))
                     },
-                    onFloatingBubbleClick = {
-                        if (DeviceController.canDrawOverlays(context)) {
-                            if (com.example.jarvisai.data.service.JarvisFloatingBubbleService.isServiceRunning) {
-                                com.example.jarvisai.data.service.JarvisFloatingBubbleService.stop(context)
-                            } else {
-                                com.example.jarvisai.data.service.JarvisFloatingBubbleService.start(context)
-                            }
-                        } else {
-                            DeviceController.openOverlaySettings(context)
-                        }
-                    },
+
                     onDocumentsClick = onNavigateToDocuments,
                     onDeviceControlClick = onNavigateToDeviceControl,
                     onMemoryClick = onNavigateToMemory,
                     onSharedTodoClick = onNavigateToSharedTodo,
                     onModelsClick = onNavigateToModels,
                     onHistoryClick = onNavigateToHistory,
-                    onLiveModeClick = { showLiveMode = true },
+                    isLiveModeActive = uiState.isLiveModeActive,
+                    onLiveModeClick = {
+                        if (!uiState.isLiveModeActive) {
+                            viewModel.startLiveMode(context)
+                        } else {
+                            viewModel.openLiveMode()
+                        }
+                    },
                     onMascotClick = { showMascotHud = true },
                     onAgentPlannerClick = onNavigateToAgentPlanner
                 )
@@ -450,7 +446,13 @@ fun ChatScreen(
                         modelName = currentModel?.name ?: "Gemini 3.6 Flash",
                         docsCount = uiState.totalDocumentsLearned,
                         onConfigureModelClick = onNavigateToModels,
-                        onOpenLiveMode = { showLiveMode = true },
+                        onOpenLiveMode = {
+                            if (!uiState.isLiveModeActive) {
+                                viewModel.startLiveMode(context)
+                            } else {
+                                viewModel.openLiveMode()
+                            }
+                        },
                         onPickDocument = {
                             documentPickerLauncher.launch(
                                 arrayOf("application/pdf", "text/plain", "application/msword", "*/*")
@@ -529,16 +531,20 @@ fun ChatScreen(
             )
         }
 
-        if (showLiveMode) {
+        if (uiState.showLiveModeDialog) {
             com.example.jarvisai.presentation.chat.components.JarvisLiveModeDialog(
                 liveEngine = viewModel.liveVoiceEngine,
                 settings = uiState.settings,
+                visualContextProvider = viewModel.visualContextProvider,
+                selectedModelId = uiState.selectedModelId,
                 onCaptureFrameProvider = { provider ->
                     viewModel.liveVisionFrameProvider = provider
                 },
                 onDismiss = {
-                    viewModel.liveVisionFrameProvider = null
-                    showLiveMode = false
+                    viewModel.dismissLiveModeDialog()
+                },
+                onStopLiveMode = {
+                    viewModel.stopLiveMode(context)
                 }
             )
         }
@@ -548,7 +554,11 @@ fun ChatScreen(
                 onDismissRequest = { showMascotHud = false },
                 onLaunchLiveMode = {
                     showMascotHud = false
-                    showLiveMode = true
+                    if (!uiState.isLiveModeActive) {
+                        viewModel.startLiveMode(context)
+                    } else {
+                        viewModel.openLiveMode()
+                    }
                 },
                 onNavigateToDeviceControl = {
                     showMascotHud = false
@@ -568,13 +578,13 @@ private fun ChatTopBar(
     tokensPerSecond: Float,
     docsCount: Int = 0,
     onShareClick: () -> Unit,
-    onFloatingBubbleClick: () -> Unit = {},
     onDocumentsClick: () -> Unit = {},
     onDeviceControlClick: () -> Unit = {},
     onMemoryClick: () -> Unit = {},
     onSharedTodoClick: () -> Unit = {},
     onModelsClick: () -> Unit,
     onHistoryClick: () -> Unit,
+    isLiveModeActive: Boolean = false,
     onLiveModeClick: () -> Unit,
     onMascotClick: () -> Unit = {},
     onAgentPlannerClick: () -> Unit,
@@ -762,10 +772,10 @@ private fun ChatTopBar(
                 Surface(
                     onClick = onLiveModeClick,
                     shape = RoundedCornerShape(18.dp),
-                    color = JarvisPrimary.copy(alpha = 0.15f),
+                    color = if (isLiveModeActive) com.example.jarvisai.ui.theme.JarvisAccentGreen.copy(alpha = 0.18f) else JarvisPrimary.copy(alpha = 0.15f),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        JarvisPrimary.copy(alpha = livePulse)
+                        if (isLiveModeActive) com.example.jarvisai.ui.theme.JarvisAccentGreen.copy(alpha = livePulse) else JarvisPrimary.copy(alpha = livePulse)
                     )
                 ) {
                     Row(
@@ -773,15 +783,24 @@ private fun ChatTopBar(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.GraphicEq,
-                            contentDescription = "Modo Live de voz continua",
-                            tint = JarvisPrimary,
-                            modifier = Modifier.size(15.dp)
-                        )
+                        if (isLiveModeActive) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(com.example.jarvisai.ui.theme.JarvisAccentGreen)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = "Modo Live de voz continua",
+                                tint = JarvisPrimary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
                         Text(
-                            text = "LIVE",
-                            color = JarvisPrimary,
+                            text = if (isLiveModeActive) "LIVE ACTIVO" else "LIVE",
+                            color = if (isLiveModeActive) com.example.jarvisai.ui.theme.JarvisAccentGreen else JarvisPrimary,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
@@ -790,23 +809,6 @@ private fun ChatTopBar(
                     }
                 }
 
-                // Floating Bubble Assistant Launcher
-                Surface(
-                    onClick = onFloatingBubbleClick,
-                    shape = CircleShape,
-                    color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentCyan.copy(alpha = 0.7f)),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.BubbleChart,
-                            contentDescription = "Burbuja Flotante Asistente",
-                            tint = JarvisAccentCyan,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
 
                 // Holographic Diagnostics & System Overflow Menu
                 var isMenuExpanded by remember { mutableStateOf(false) }

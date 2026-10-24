@@ -8,6 +8,7 @@ import com.example.jarvisai.domain.model.ModelProvider
  * UI State for ChatScreen.
  */
 data class ChatUiState(
+    val sessionId: String? = null,
     val conversation: Conversation? = null,
     val messages: List<Message> = emptyList(),
     val selectedModelId: String = "gemini-3.6-flash",
@@ -31,9 +32,16 @@ data class ChatUiState(
     val userProfile: com.example.jarvisai.domain.model.UserProfile = com.example.jarvisai.domain.model.UserProfile(),
     val pendingActionConfirmation: com.example.jarvisai.data.action.ActionRequest? = null,
     val pendingActionJson: String? = null,
+    val showLiveModeDialog: Boolean = false,
+    val isLiveModeActive: Boolean = false,
+    val liveVoiceState: com.example.jarvisai.domain.voice.LiveVoiceSessionState = com.example.jarvisai.domain.voice.LiveVoiceSessionState(),
+    val liveVisualState: com.example.jarvisai.domain.visual.LiveVisualState = com.example.jarvisai.domain.visual.LiveVisualState.Off,
     val errorMessage: String? = null
 ) {
     val isGenerating: Boolean get() = inferenceStatus is ChatInferenceStatus.Generating
+
+    val isVisualSupportedByCurrentModel: Boolean
+        get() = com.example.jarvisai.domain.model.CloudAiModel.supportsVision(selectedModelId)
 
     fun isProviderReady(provider: ModelProvider): Boolean {
         if (provider == ModelProvider.GEMINI) {

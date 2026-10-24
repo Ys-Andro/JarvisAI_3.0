@@ -87,6 +87,10 @@ class AppContainer(private val context: Context) {
         DocumentRepositoryImpl(documentDao)
     }
 
+    val sessionManager: com.example.jarvisai.data.session.SessionManager by lazy {
+        com.example.jarvisai.data.session.SessionManager.getInstance()
+    }
+
     val conversationRepository: IConversationRepository by lazy {
         ConversationRepositoryImpl(conversationDao, messageDao)
     }
@@ -116,7 +120,11 @@ class AppContainer(private val context: Context) {
     }
 
     val liveVoiceEngine: com.example.jarvisai.domain.voice.ILiveVoiceEngine by lazy {
-        com.example.jarvisai.data.voice.AndroidLiveVoiceEngine(context, ttsRepository, settingsRepository)
+        com.example.jarvisai.data.voice.AndroidLiveVoiceEngine.getInstance(context, ttsRepository, settingsRepository)
+    }
+
+    val liveVisualContextProvider: com.example.jarvisai.domain.visual.ILiveVisualContextProvider by lazy {
+        com.example.jarvisai.data.voice.visual.LiveVisualContextProvider.getInstance(context)
     }
 
     val backupManager: com.example.jarvisai.data.backup.JarvisBackupManager by lazy {
@@ -129,5 +137,16 @@ class AppContainer(private val context: Context) {
 
     val googleAuthManager: com.example.jarvisai.data.auth.GoogleAuthManager by lazy {
         com.example.jarvisai.data.auth.GoogleAuthManager(context)
+    }
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppContainer? = null
+
+        fun getInstance(context: Context): AppContainer {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: AppContainer(context.applicationContext).also { INSTANCE = it }
+            }
+        }
     }
 }

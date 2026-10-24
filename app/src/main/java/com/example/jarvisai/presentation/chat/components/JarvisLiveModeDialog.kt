@@ -1,6 +1,7 @@
 package com.example.jarvisai.presentation.chat.components
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,10 +38,17 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
+import android.media.projection.MediaProjectionManager
+import android.widget.Toast
+import com.example.jarvisai.domain.model.CloudAiModel
+import com.example.jarvisai.domain.visual.ILiveVisualContextProvider
+import com.example.jarvisai.domain.visual.LiveVisualState
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -92,15 +100,34 @@ import com.example.jarvisai.ui.theme.JarvisTextSecondary
 fun JarvisLiveModeDialog(
     liveEngine: ILiveVoiceEngine,
     settings: GenerationSettings,
+    visualContextProvider: ILiveVisualContextProvider? = null,
+    selectedModelId: String = "gemini-3.6-flash",
     onDismiss: () -> Unit,
+    onStopLiveMode: () -> Unit = {},
     modifier: Modifier = Modifier,
     onCaptureFrameProvider: (((() -> String?)?) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val sessionState by liveEngine.sessionState.collectAsState()
+    val visualState by (visualContextProvider?.visualState ?: remember { MutableStateFlow<LiveVisualState>(LiveVisualState.Off) }).collectAsState()
     var isTuningOpen by remember { mutableStateOf(false) }
     var isLiveVisionActive by remember { mutableStateOf(false) }
     val liveVisionController = remember { LiveVisionController() }
+
+    val mediaProjectionManager = remember {
+        context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+    }
+
+    val mediaProjectionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        visualContextProvider?.onMediaProjectionPermissionResult(result.resultCode, result.data)
+    }
+
+    // Intercept back button to minimize to background instead of stopping session
+    androidx.activity.compose.BackHandler {
+        onDismiss()
+    }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -128,13 +155,21 @@ fun JarvisLiveModeDialog(
     ) { isGranted ->
         hasAudioPermission = isGranted
         if (isGranted) {
-            liveEngine.startListening()
+            if (!liveEngine.isLiveModeActive.value) {
+                liveEngine.startLiveMode()
+            } else if (!sessionState.isMuted) {
+                liveEngine.startListening()
+            }
         }
     }
 
     LaunchedEffect(hasAudioPermission) {
         if (hasAudioPermission) {
-            liveEngine.startListening()
+            if (!liveEngine.isLiveModeActive.value) {
+                liveEngine.startLiveMode()
+            } else if (!sessionState.isMuted) {
+                liveEngine.startListening()
+            }
         } else {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -150,7 +185,9 @@ fun JarvisLiveModeDialog(
 
     DisposableEffect(Unit) {
         onDispose {
-            liveEngine.stopListening()
+            // Decoupled lifecycle: hiding/closing the dialog UI does NOT destroy the Live Mode session.
+            // Only release optical/camera resources so camera hardware is never kept open in background.
+            isLiveVisionActive = false
             onCaptureFrameProvider?.invoke(null)
         }
     }
@@ -204,62 +241,256 @@ fun JarvisLiveModeDialog(
                         )
                     }
 
-                    // Top Controls (Voice Tuning, Live Vision & Close)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Live Vision Toggle Button
-                        IconButton(
-                            onClick = {
-                                if (!hasCameraPermission) {
-                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                } else {
-                                    isLiveVisionActive = !isLiveVisionActive
-                                }
-                            },
+                    // Top Controls (Screen Vision, Camera, Voice Tuning, Stop & Close)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val buttonShape = RoundedCornerShape(10.dp)
+
+                        // Screen Visual Context (MediaProjection) Button
+                        Box(
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(if (isLiveVisionActive) JarvisPrimary.copy(alpha = 0.25f) else JarvisSurface)
-                                .border(1.dp, if (isLiveVisionActive) JarvisPrimary else JarvisBorder, CircleShape)
+                                .size(34.dp)
+                                .clip(buttonShape)
+                                .background(
+                                    when (visualState) {
+                                        is LiveVisualState.WaitingAuthorization -> Color(0xFF3E320A).copy(alpha = 0.9f)
+                                        is LiveVisualState.On -> JarvisAccentGreen.copy(alpha = 0.22f)
+                                        is LiveVisualState.Capturing -> Color(0xFF381447).copy(alpha = 0.9f)
+                                        is LiveVisualState.Error -> JarvisAccentRed.copy(alpha = 0.22f)
+                                        else -> Color(0xFF0F1E33).copy(alpha = 0.85f)
+                                    }
+                                )
+                                .border(
+                                    1.dp,
+                                    when (visualState) {
+                                        is LiveVisualState.WaitingAuthorization -> Color(0xFFFFD600)
+                                        is LiveVisualState.On -> JarvisAccentGreen
+                                        is LiveVisualState.Capturing -> Color(0xFFE040FB)
+                                        is LiveVisualState.Error -> JarvisAccentRed
+                                        else -> JarvisBorder.copy(alpha = 0.6f)
+                                    },
+                                    buttonShape
+                                )
+                                .clickable {
+                                    if (visualState is LiveVisualState.On || visualState is LiveVisualState.Capturing || visualState is LiveVisualState.WaitingAuthorization) {
+                                        visualContextProvider?.disableVisualContext()
+                                    } else {
+                                        if (!CloudAiModel.supportsVision(selectedModelId)) {
+                                            Toast.makeText(
+                                                context,
+                                                "El modelo actual ($selectedModelId) solo admite texto. Cambia a Gemini 3.6 Flash o GPT-4o para contexto visual.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            visualContextProvider?.requestVisualContext {
+                                                mediaProjectionManager?.let { mpm ->
+                                                    mediaProjectionLauncher.launch(mpm.createScreenCaptureIntent())
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Smartphone,
+                                contentDescription = "Contexto Visual de Pantalla",
+                                modifier = Modifier.size(18.dp),
+                                tint = when (visualState) {
+                                    is LiveVisualState.WaitingAuthorization -> Color(0xFFFFD600)
+                                    is LiveVisualState.On -> JarvisAccentGreen
+                                    is LiveVisualState.Capturing -> Color(0xFFE040FB)
+                                    is LiveVisualState.Error -> JarvisAccentRed
+                                    else -> JarvisTextPrimary.copy(alpha = 0.85f)
+                                }
+                            )
+                        }
+
+                        // Live Vision Camera Toggle Button
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(buttonShape)
+                                .background(
+                                    if (isLiveVisionActive) JarvisPrimary.copy(alpha = 0.25f)
+                                    else Color(0xFF0F1E33).copy(alpha = 0.85f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isLiveVisionActive) JarvisPrimary else JarvisBorder.copy(alpha = 0.6f),
+                                    buttonShape
+                                )
+                                .clickable {
+                                    if (!hasCameraPermission) {
+                                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                    } else {
+                                        isLiveVisionActive = !isLiveVisionActive
+                                    }
+                                }
                         ) {
                             Icon(
                                 imageVector = if (isLiveVisionActive) Icons.Default.Videocam else Icons.Default.VideocamOff,
                                 contentDescription = "Activar/Desactivar Visión en Vivo",
-                                tint = if (isLiveVisionActive) JarvisPrimary else JarvisTextPrimary
+                                modifier = Modifier.size(18.dp),
+                                tint = if (isLiveVisionActive) JarvisPrimary else JarvisTextPrimary.copy(alpha = 0.85f)
                             )
                         }
 
-                        IconButton(
-                            onClick = { isTuningOpen = !isTuningOpen },
+                        // Tuning Button
+                        Box(
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(if (isTuningOpen) JarvisPrimary.copy(alpha = 0.2f) else JarvisSurface)
-                                .border(1.dp, if (isTuningOpen) JarvisPrimary else JarvisBorder, CircleShape)
+                                .size(34.dp)
+                                .clip(buttonShape)
+                                .background(
+                                    if (isTuningOpen) JarvisPrimary.copy(alpha = 0.25f)
+                                    else Color(0xFF0F1E33).copy(alpha = 0.85f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isTuningOpen) JarvisPrimary else JarvisBorder.copy(alpha = 0.6f),
+                                    buttonShape
+                                )
+                                .clickable { isTuningOpen = !isTuningOpen }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Tune,
                                 contentDescription = "Configuración de Voz y Tono",
-                                tint = if (isTuningOpen) JarvisPrimary else JarvisTextPrimary
+                                modifier = Modifier.size(18.dp),
+                                tint = if (isTuningOpen) JarvisPrimary else JarvisTextPrimary.copy(alpha = 0.85f)
                             )
                         }
 
-                        IconButton(
-                            onClick = {
-                                liveEngine.stopListening()
-                                onDismiss()
-                            },
+                        // Subtle Divider between Tools and Session Termination Controls
+                        Box(
                             modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(JarvisSurface)
-                                .border(1.dp, JarvisBorder, CircleShape)
+                                .padding(horizontal = 2.dp)
+                                .width(1.dp)
+                                .height(16.dp)
+                                .background(JarvisBorder.copy(alpha = 0.45f))
+                        )
+
+                        // Stop / Finalize Live Mode (Crimson Glass)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(buttonShape)
+                                .background(Color(0xFF2E0D14).copy(alpha = 0.9f))
+                                .border(1.dp, JarvisAccentRed.copy(alpha = 0.8f), buttonShape)
+                                .clickable { onStopLiveMode() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = "Finalizar Live Mode",
+                                modifier = Modifier.size(18.dp),
+                                tint = JarvisAccentRed
+                            )
+                        }
+
+                        // Minimize to background (Slate Glass)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(buttonShape)
+                                .background(Color(0xFF0F1E33).copy(alpha = 0.85f))
+                                .border(1.dp, Color(0x33FFFFFF), buttonShape)
+                                .clickable { onDismiss() }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Cerrar Live Mode",
-                                tint = JarvisTextPrimary
+                                contentDescription = "Minimizar a segundo plano",
+                                modifier = Modifier.size(18.dp),
+                                tint = JarvisTextPrimary.copy(alpha = 0.85f)
                             )
                         }
+                    }
+                }
+
+                // Privacy Visual Context Banner
+                AnimatedVisibility(
+                    visible = visualState !is LiveVisualState.Off,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                when (visualState) {
+                                    is LiveVisualState.WaitingAuthorization -> Color(0xFF261E05)
+                                    is LiveVisualState.On -> Color(0xFF071F15)
+                                    is LiveVisualState.Capturing -> Color(0xFF21092D)
+                                    is LiveVisualState.Error -> Color(0xFF2B0E0E)
+                                    else -> Color(0xFF0B1424)
+                                }
+                            )
+                            .border(
+                                1.dp,
+                                when (visualState) {
+                                    is LiveVisualState.WaitingAuthorization -> Color(0xFFFFD600)
+                                    is LiveVisualState.On -> JarvisAccentGreen
+                                    is LiveVisualState.Capturing -> Color(0xFFE040FB)
+                                    is LiveVisualState.Error -> JarvisAccentRed
+                                    else -> JarvisBorder
+                                },
+                                RoundedCornerShape(12.dp)
+                            )
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = when (visualState) {
+                                    is LiveVisualState.WaitingAuthorization -> "Contexto visual: Esperando autorización..."
+                                    is LiveVisualState.On -> "Contexto visual ON"
+                                    is LiveVisualState.Capturing -> "Capturando pantalla..."
+                                    is LiveVisualState.Error -> "Error de contexto visual"
+                                    else -> "Contexto visual"
+                                },
+                                color = when (visualState) {
+                                    is LiveVisualState.WaitingAuthorization -> Color(0xFFFFD600)
+                                    is LiveVisualState.On -> JarvisAccentGreen
+                                    is LiveVisualState.Capturing -> Color(0xFFE040FB)
+                                    is LiveVisualState.Error -> JarvisAccentRed
+                                    else -> JarvisPrimary
+                                },
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = when (visualState) {
+                                    is LiveVisualState.WaitingAuthorization -> "Autoriza en el aviso del sistema Android para continuar."
+                                    is LiveVisualState.On -> "Captura bajo demanda cuando pidas analizar la pantalla."
+                                    is LiveVisualState.Capturing -> "Enviando frame a $selectedModelId..."
+                                    is LiveVisualState.Error -> (visualState as LiveVisualState.Error).message
+                                    else -> ""
+                                },
+                                color = JarvisTextSecondary,
+                                fontSize = 10.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Text(
+                            text = "DETENER",
+                            color = JarvisAccentRed,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { visualContextProvider?.disableVisualContext() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                     }
                 }
 
@@ -342,6 +573,63 @@ fun JarvisLiveModeDialog(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(horizontal = 24.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    val canDrawOverlays = remember(context) {
+                        com.example.jarvisai.data.util.DeviceController.canDrawOverlays(context)
+                    }
+
+                    if (!canDrawOverlays) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(JarvisSurface)
+                                .border(1.dp, JarvisBorder, RoundedCornerShape(12.dp))
+                                .clickable {
+                                    com.example.jarvisai.data.util.DeviceController.openOverlaySettings(context)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = JarvisPrimary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Activar control flotante al salir",
+                                color = JarvisPrimary,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF0F1E33))
+                                .border(1.dp, JarvisBorder.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(JarvisAccentGreen)
+                            )
+                            Text(
+                                text = "Control flotante activo al salir",
+                                color = JarvisTextSecondary,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
                 }
 
                 // Bottom Action Bar

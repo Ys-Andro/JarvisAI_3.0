@@ -43,8 +43,10 @@ class ChatViewModel(
     private val documentRepository: IDocumentRepository,
     private val memoryRepository: IMemoryRepository,
     val liveVoiceEngine: ILiveVoiceEngine,
+    val visualContextProvider: com.example.jarvisai.domain.visual.ILiveVisualContextProvider,
     private val agentOrchestrator: AgentOrchestrator,
-    private val actionExecutor: ActionExecutor? = null
+    private val actionExecutor: ActionExecutor? = null,
+    private val sessionManager: com.example.jarvisai.data.session.SessionManager = com.example.jarvisai.data.session.SessionManager.getInstance()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -60,7 +62,8 @@ class ChatViewModel(
         observeModelAndApiKeys()
         observeSettings()
         observeKnowledgeAndMemories()
-        initDefaultConversation()
+        observeVisualContextState()
+        initSessionConversation()
         setupLiveVoiceEngine()
         setupActionConfirmationListener()
     }
@@ -99,17 +102,89 @@ class ChatViewModel(
         liveVoiceEngine.setResponseProvider { query ->
             generateDirectAnswer(query)
         }
+        viewModelScope.launch {
+            liveVoiceEngine.isLiveModeActive.collect { active ->
+                _uiState.update { it.copy(isLiveModeActive = active) }
+            }
+        }
+        viewModelScope.launch {
+            liveVoiceEngine.sessionState.collect { voiceState ->
+                _uiState.update { it.copy(liveVoiceState = voiceState) }
+            }
+        }
+    }
+
+    fun openLiveMode() {
+        _uiState.update { it.copy(showLiveModeDialog = true) }
+    }
+
+    fun dismissLiveModeDialog() {
+        _uiState.update { it.copy(showLiveModeDialog = false) }
+        liveVisionFrameProvider = null
+    }
+
+    fun startLiveMode(context: android.content.Context) {
+        _uiState.update { it.copy(showLiveModeDialog = true) }
+        liveVoiceEngine.startLiveMode()
+        com.example.jarvisai.data.service.JarvisLiveVoiceService.start(context)
+    }
+
+    private fun observeVisualContextState() {
+        viewModelScope.launch {
+            visualContextProvider.visualState.collect { vState ->
+                _uiState.update { it.copy(liveVisualState = vState) }
+            }
+        }
+    }
+
+    fun toggleVisualContext(onRequestConsent: () -> Unit) {
+        if (visualContextProvider.isVisualActive) {
+            visualContextProvider.disableVisualContext()
+        } else {
+            val modelId = _uiState.value.selectedModelId
+            val modelSupportsVision = com.example.jarvisai.domain.model.CloudAiModel.supportsVision(modelId)
+            if (!modelSupportsVision) {
+                _uiState.update {
+                    it.copy(errorMessage = "El modelo actual ($modelId) no admite visión. Selecciona Gemini 3.6 Flash o GPT-4o para contexto visual.")
+                }
+                return
+            }
+            visualContextProvider.requestVisualContext(onRequestConsent)
+        }
+    }
+
+    fun disableVisualContext() {
+        visualContextProvider.disableVisualContext()
+    }
+
+    fun stopLiveMode(context: android.content.Context) {
+        _uiState.update { it.copy(showLiveModeDialog = false) }
+        liveVisionFrameProvider = null
+        visualContextProvider.disableVisualContext()
+        liveVoiceEngine.stopLiveMode()
+        com.example.jarvisai.data.service.JarvisLiveVoiceService.stop(context)
+    }
+
+    fun toggleLiveVoiceMute() {
+        val currentMuted = liveVoiceEngine.sessionState.value.isMuted
+        liveVoiceEngine.setMuted(!currentMuted)
     }
 
     private suspend fun generateDirectAnswer(query: String): String {
+        var activeAssistantMsgId: String? = null
         return try {
             val convId = currentConversationId ?: run {
-                val newId = conversationRepository.createConversation(
-                    title = "Conversación Jarvis Live",
-                    modelId = _uiState.value.selectedModelId
-                )
-                currentConversationId = newId
-                newId
+                val sessionId = sessionManager.getOrCreateSessionId()
+                val existing = conversationRepository.getConversationById(sessionId).first()
+                if (existing == null) {
+                    conversationRepository.createConversation(
+                        title = "Jarvis Session",
+                        modelId = _uiState.value.selectedModelId,
+                        customId = sessionId
+                    )
+                }
+                currentConversationId = sessionId
+                sessionId
             }
 
             val userMsg = Message(
@@ -122,6 +197,7 @@ class ChatViewModel(
             conversationRepository.insertMessage(userMsg)
 
             val assistantMsgId = UUID.randomUUID().toString()
+            activeAssistantMsgId = assistantMsgId
             val assistantMsg = Message(
                 id = assistantMsgId,
                 conversationId = convId,
@@ -133,11 +209,30 @@ class ChatViewModel(
 
             val settings = settingsRepository.getSettings().first()
             val history = _uiState.value.messages
-            val capturedFrame = liveVisionFrameProvider?.invoke()
-            val effectivePrompt = if (capturedFrame != null) {
-                "[MODO LIVE VISION ACTIVO: El usuario te está mostrando la cámara en tiempo real. Analiza visualmente lo que se ve en el feed óptico junto con su pregunta/comentario]\n$query"
+
+            val currentModelId = _uiState.value.selectedModelId
+            val modelSupportsVision = com.example.jarvisai.domain.model.CloudAiModel.supportsVision(currentModelId)
+
+            // Strictly user-controlled visual frame acquisition:
+            // Only acquire if visual context was explicitly enabled by user and current model supports multimodal input.
+            val capturedFrame = if (visualContextProvider.isVisualActive && modelSupportsVision) {
+                visualContextProvider.captureFrameBase64()
+            } else if (liveVisionFrameProvider != null && modelSupportsVision) {
+                liveVisionFrameProvider?.invoke()
             } else {
-                query
+                null
+            }
+
+            val effectivePrompt = when {
+                capturedFrame != null -> {
+                    "[MODO LIVE VISION ACTIVO: El usuario te ha compartido una captura de pantalla en tiempo real de su dispositivo. Analiza cuidadosamente los elementos visuales de la pantalla junto con la consulta del usuario]\n$query"
+                }
+                visualContextProvider.isVisualActive && !modelSupportsVision -> {
+                    "[Aviso del sistema: El usuario tiene el contexto visual activado para ver su pantalla, pero el modelo activo ($currentModelId) no soporta visión multimodal. Indica brevemente que para responder viendo la pantalla debe cambiar a un modelo compatible con visión como Gemini 3.6 Flash o GPT-4o]\n$query"
+                }
+                else -> {
+                    query
+                }
             }
             val responseBuilder = StringBuilder()
             val startTime = System.currentTimeMillis()
@@ -168,7 +263,18 @@ class ChatViewModel(
 
             sanitizedResult.ifBlank { "Procesado correctamente." }
         } catch (e: Exception) {
-            "Entendido. Hubo un detalle al procesar: ${e.message}"
+            val fallbackMessage = "Disculpa, hubo un inconveniente al procesar la respuesta: ${e.localizedMessage ?: "error de conexión"}. Por favor intenta de nuevo."
+            activeAssistantMsgId?.let { msgId ->
+                try {
+                    conversationRepository.updateMessageContent(
+                        messageId = msgId,
+                        content = fallbackMessage,
+                        tokensPerSec = 0f,
+                        durationMs = 0L
+                    )
+                } catch (_: Exception) {}
+            }
+            fallbackMessage
         }
     }
 
@@ -367,16 +473,26 @@ class ChatViewModel(
         }
     }
 
-    private fun initDefaultConversation() {
+    private fun initSessionConversation() {
         viewModelScope.launch {
-            val conversations = conversationRepository.getAllConversations().first()
-            val targetId = if (conversations.isNotEmpty()) {
-                conversations.first().id
-            } else {
-                conversationRepository.createConversation("Jarvis Session", null)
+            val sessionId = sessionManager.getOrCreateSessionId()
+            _uiState.update { it.copy(sessionId = sessionId) }
+
+            // Ensure active conversation associated with this session exists in Room
+            val existing = conversationRepository.getConversationById(sessionId).first()
+            if (existing == null) {
+                conversationRepository.createConversation(
+                    title = "Jarvis Session",
+                    modelId = _uiState.value.selectedModelId,
+                    customId = sessionId
+                )
             }
-            selectConversation(targetId)
+            selectConversation(sessionId)
         }
+    }
+
+    fun endSession() {
+        sessionManager.endSession()
     }
 
     fun selectConversation(conversationId: String) {
@@ -887,11 +1003,16 @@ class ChatViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        // If Live Mode is actively running in background via foreground service,
+        // preserve the session and engine so background voice conversation continues smoothly.
+        if (!liveVoiceEngine.isLiveModeActive.value) {
+            sessionManager.endSession()
+            liveVoiceEngine.release()
+            viewModelScope.launch {
+                ttsRepository.stop()
+            }
+        }
         ActionParser.onConfirmationRequested = null
         generationJob?.cancel()
-        liveVoiceEngine.release()
-        viewModelScope.launch {
-            ttsRepository.stop()
-        }
     }
 }

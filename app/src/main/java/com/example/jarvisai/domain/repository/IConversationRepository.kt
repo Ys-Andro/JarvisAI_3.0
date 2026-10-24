@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 interface IConversationRepository {
     fun getAllConversations(): Flow<List<Conversation>>
     fun getConversationById(conversationId: String): Flow<Conversation?>
-    suspend fun createConversation(title: String, modelId: String?): String
+    suspend fun createConversation(title: String, modelId: String?, customId: String? = null): String
     suspend fun updateConversationTitle(conversationId: String, newTitle: String)
     suspend fun deleteConversation(conversationId: String)
     suspend fun clearAllConversations()

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/overlay_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_live_overlay"
+    android:elevation="12dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <!-- Drag & Status Area -->
+    <LinearLayout
+        android:id="@+id/overlay_drag_area"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingEnd="10dp">
+
+        <!-- Glowing Status Dot -->
+        <View
+            android:id="@+id/overlay_status_dot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_widget_status_pill" />
+
+        <!-- Status Labels -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/overlay_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="JARVIS LIVE"
+                android:textColor="#00E5FF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/overlay_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxWidth="110dp"
+                android:maxLines="1"
+                android:text="Escuchando..."
+                android:textColor="#B0BEC5"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Small Visual Divider -->
+    <View
+        android:layout_width="1dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="8dp"
+        android:background="#3300E5FF" />
+
+    <!-- Action: Mute / Unmute Toggle -->
+    <ImageButton
+        android:id="@+id/overlay_btn_mute"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_overlay_button"
+        android:contentDescription="Silenciar / Activar micrófono"
+        android:src="@drawable/ic_overlay_mic" />
+
+    <!-- Action: Screen Vision Context Toggle -->
+    <ImageButton
+        android:id="@+id/overlay_btn_vision"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_overlay_button"
+        android:contentDescription="Contexto Visual de Pantalla"
+        android:src="@drawable/ic_overlay_vision" />
+
+    <!-- Action: Open / Return to JARVIS -->
+    <ImageButton
+        android:id="@+id/overlay_btn_open"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_overlay_button"
+        android:contentDescription="Volver a JARVIS"
+        android:src="@drawable/ic_overlay_open" />
+
+    <!-- Action: Finalize / Stop Live Mode -->
+    <ImageButton
+        android:id="@+id/overlay_btn_stop"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_overlay_stop_button"
+        android:contentDescription="Finalizar LIVE MODE"
+        android:src="@drawable/ic_overlay_stop" />
+
+</LinearLayout>

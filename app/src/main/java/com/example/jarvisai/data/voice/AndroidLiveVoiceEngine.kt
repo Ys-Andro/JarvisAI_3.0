@@ -35,6 +35,21 @@ class AndroidLiveVoiceEngine(
 
     companion object {
         private const val TAG = "LiveVoiceEngine"
+
+        @Volatile
+        private var INSTANCE: AndroidLiveVoiceEngine? = null
+
+        fun getInstance(
+            context: Context,
+            ttsRepository: ITtsRepository,
+            settingsRepository: ISettingsRepository
+        ): AndroidLiveVoiceEngine {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: AndroidLiveVoiceEngine(context.applicationContext, ttsRepository, settingsRepository).also {
+                    INSTANCE = it
+                }
+            }
+        }
     }
 
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -43,6 +58,10 @@ class AndroidLiveVoiceEngine(
     private val _sessionState = MutableStateFlow(LiveVoiceSessionState())
     override val sessionState: StateFlow<LiveVoiceSessionState> = _sessionState.asStateFlow()
 
+    private val _isLiveModeActive = MutableStateFlow(false)
+    override val isLiveModeActive: StateFlow<Boolean> = _isLiveModeActive.asStateFlow()
+
+    private var _isPaused = false
     private var speechRecognizer: SpeechRecognizer? = null
     private var responseProvider: (suspend (String) -> String)? = null
     private var processingJob: Job? = null
@@ -57,8 +76,8 @@ class AndroidLiveVoiceEngine(
         engineScope.launch {
             ttsRepository.isSpeaking.collect { isSpeaking ->
                 if (!isSpeaking && _sessionState.value.phase is LiveVoicePhase.Speaking) {
-                    // Finished speaking response -> Return smoothly to continuous listening if not muted
-                    if (!_sessionState.value.isMuted) {
+                    // Finished speaking response -> Return smoothly to continuous listening if active and not muted
+                    if (!_sessionState.value.isMuted && _isLiveModeActive.value && !_isPaused) {
                         _sessionState.update {
                             it.copy(
                                 phase = LiveVoicePhase.Listening,
@@ -66,11 +85,11 @@ class AndroidLiveVoiceEngine(
                             )
                         }
                         mainHandler.postDelayed({
-                            if (!_sessionState.value.isMuted && _sessionState.value.phase is LiveVoicePhase.Listening && !isListeningActive) {
+                            if (!_sessionState.value.isMuted && _isLiveModeActive.value && !_isPaused && _sessionState.value.phase is LiveVoicePhase.Listening && !isListeningActive) {
                                 startListening()
                             }
                         }, 250)
-                    } else {
+                    } else if (_sessionState.value.isMuted) {
                         _sessionState.update { it.copy(phase = LiveVoicePhase.Idle, statusLabel = "Micrófono en pausa") }
                     }
                 }
@@ -162,10 +181,10 @@ class AndroidLiveVoiceEngine(
                 when (error) {
                     SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
                     SpeechRecognizer.ERROR_NO_MATCH -> {
-                        if (!_sessionState.value.isMuted && _sessionState.value.phase !is LiveVoicePhase.Speaking && _sessionState.value.phase !is LiveVoicePhase.Processing) {
+                        if (_isLiveModeActive.value && !_isPaused && !_sessionState.value.isMuted && _sessionState.value.phase !is LiveVoicePhase.Speaking && _sessionState.value.phase !is LiveVoicePhase.Processing) {
                             _sessionState.update { it.copy(statusLabel = "Listo. Esperando voz...") }
                             mainHandler.postDelayed({
-                                if (!_sessionState.value.isMuted && !isListeningActive) {
+                                if (_isLiveModeActive.value && !_isPaused && !_sessionState.value.isMuted && !isListeningActive) {
                                     startListening()
                                 }
                             }, 800)
@@ -201,7 +220,7 @@ class AndroidLiveVoiceEngine(
                 if (!spokenText.isNullOrBlank()) {
                     handleUserQuery(spokenText)
                 } else {
-                    if (!_sessionState.value.isMuted) {
+                    if (_isLiveModeActive.value && !_isPaused && !_sessionState.value.isMuted) {
                         mainHandler.postDelayed({ startListening() }, 600)
                     }
                 }
@@ -279,8 +298,58 @@ class AndroidLiveVoiceEngine(
         this.responseProvider = provider
     }
 
+    override fun startLiveMode() {
+        _isLiveModeActive.value = true
+        _isPaused = false
+        _sessionState.update {
+            it.copy(
+                phase = LiveVoicePhase.Listening,
+                statusLabel = "Modo Live iniciado. Escuchando..."
+            )
+        }
+        startListening()
+    }
+
+    override fun stopLiveMode() {
+        _isLiveModeActive.value = false
+        _isPaused = false
+        processingJob?.cancel()
+        engineScope.launch {
+            ttsRepository.stop()
+        }
+        stopListening()
+        _sessionState.update {
+            it.copy(
+                phase = LiveVoicePhase.Idle,
+                audioAmplitude = 0f,
+                partialTranscript = "",
+                statusLabel = "Modo Live finalizado"
+            )
+        }
+    }
+
+    override fun setPaused(paused: Boolean) {
+        _isPaused = paused
+        if (paused) {
+            stopListening()
+            _sessionState.update {
+                it.copy(
+                    phase = LiveVoicePhase.Idle,
+                    statusLabel = "Sesión en pausa"
+                )
+            }
+        } else {
+            if (_isLiveModeActive.value && !_sessionState.value.isMuted) {
+                startListening()
+            }
+        }
+    }
+
     override fun startListening() {
-        if (_sessionState.value.isMuted) return
+        if (_sessionState.value.isMuted || _isPaused) return
+        if (!_isLiveModeActive.value) {
+            _isLiveModeActive.value = true
+        }
 
         engineScope.launch {
             try {
@@ -349,7 +418,9 @@ class AndroidLiveVoiceEngine(
                 )
             }
         } else {
-            startListening()
+            if (_isLiveModeActive.value && !_isPaused) {
+                startListening()
+            }
         }
     }
 
@@ -365,7 +436,7 @@ class AndroidLiveVoiceEngine(
             )
         }
         mainHandler.postDelayed({
-            if (!_sessionState.value.isMuted) {
+            if (!_sessionState.value.isMuted && _isLiveModeActive.value && !_isPaused) {
                 startListening()
             }
         }, 200)
@@ -394,6 +465,7 @@ class AndroidLiveVoiceEngine(
     }
 
     override fun release() {
+        stopLiveMode()
         processingJob?.cancel()
         engineScope.cancel()
         mainHandler.removeCallbacksAndMessages(null)
@@ -405,5 +477,10 @@ class AndroidLiveVoiceEngine(
             Log.w(TAG, "Error releasing SpeechRecognizer: ${e.message}")
         }
         speechRecognizer = null
+        synchronized(AndroidLiveVoiceEngine::class.java) {
+            if (INSTANCE === this) {
+                INSTANCE = null
+            }
+        }
     }
 }

@@ -591,7 +591,7 @@ fun SettingsScreen(
                                                 text = if (uiState.hotwordAutoLaunchApp)
                                                     "Abre la app principal automáticamente"
                                                 else
-                                                    "Modo discreto: Sólo activa la burbuja/HUD holográfico sin interrumpir otras aplicaciones",
+                                                    "Modo discreto: Responde por voz en segundo plano sin interrumpir otras aplicaciones",
                                                 color = JarvisTextSecondary,
                                                 fontSize = 10.sp
                                             )

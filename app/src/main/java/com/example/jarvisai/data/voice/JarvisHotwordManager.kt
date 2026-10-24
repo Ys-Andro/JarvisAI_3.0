@@ -20,7 +20,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.jarvisai.data.local.datastore.AppPreferences
-import com.example.jarvisai.data.service.JarvisFloatingBubbleService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,7 +41,7 @@ import java.util.Locale
  * 2. Confidence/Alternative scoring filter
  * 3. Cooldown protection (4 seconds minimum between triggers)
  * 4. Adjustable sensitivity levels: LOW (standard/default - requires clear invocation), MEDIUM, HIGH
- * 5. Optional background floating bubble trigger without intrusive full-screen activity popping if disabled
+ * 5. Optional voice response or launch without intrusive full-screen activity popping if disabled
  */
 class JarvisHotwordManager(private val context: Context) {
 
@@ -323,18 +322,7 @@ class JarvisHotwordManager(private val context: Context) {
 
     private fun onHotwordTriggered(autoLaunchApp: Boolean) {
         try {
-            // 1. Always display or activate the floating HUD/Bubble if overlay permission is granted
-            if (Settings.canDrawOverlays(context)) {
-                try {
-                    val bubbleIntent = Intent(context, JarvisFloatingBubbleService::class.java)
-                    context.startService(bubbleIntent)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error starting floating bubble: ${e.message}")
-                }
-            }
-
-            // 2. Open or bring MainActivity to front only if autoLaunchApp is true,
-            // avoiding unwanted intrusive full-screen context switching while the user is in other apps
+            // Open or bring MainActivity to front if autoLaunchApp is true
             if (autoLaunchApp) {
                 val intent = Intent(context, MainActivity::class.java).apply {
                     action = Intent.ACTION_VOICE_COMMAND

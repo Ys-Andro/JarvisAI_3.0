@@ -108,7 +108,7 @@ class ActionParser {
                 listOf("llama", "llamar", "llamada", "marca", "marcar", "telefono", "teléfono", "call").any { prompt.contains(it) }
             }
             "WHATSAPP_MESSAGE" -> {
-                listOf("whatsapp", "mensaje", "watsap", "wasap", "whats", "escribe a", "manda", "mandale").any { prompt.contains(it) }
+                listOf("whatsapp", "watsap", "wasap", "whats").any { prompt.contains(it) }
             }
             "FLASHLIGHT" -> {
                 listOf("linterna", "flash", "luz", "ilumina", "enciende la luz", "apaga la luz").any { prompt.contains(it) }

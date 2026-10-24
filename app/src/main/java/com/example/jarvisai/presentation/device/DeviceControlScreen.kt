@@ -107,12 +107,6 @@ fun DeviceControlScreen(
     var isNotificationAccessEnabled by remember {
         mutableStateOf(JarvisNotificationListenerService.isPermissionGranted(context))
     }
-    var isOverlayPermissionGranted by remember {
-        mutableStateOf(DeviceController.canDrawOverlays(context))
-    }
-    var isFloatingBubbleRunning by remember {
-        mutableStateOf(com.example.jarvisai.data.service.JarvisFloatingBubbleService.isServiceRunning)
-    }
 
     var isFlashlightOn by remember { mutableStateOf(false) }
     var volumeLevel by remember { mutableFloatStateOf(50f) }
@@ -126,8 +120,6 @@ fun DeviceControlScreen(
             isAccessibilityEnabled = JarvisAccessibilityService.isAccessibilityServiceEnabled(context)
             isDefaultAssistant = checkDefaultAssistant(context)
             isNotificationAccessEnabled = JarvisNotificationListenerService.isPermissionGranted(context)
-            isOverlayPermissionGranted = DeviceController.canDrawOverlays(context)
-            isFloatingBubbleRunning = com.example.jarvisai.data.service.JarvisFloatingBubbleService.isServiceRunning
             batteryInfo = DeviceController.getBatteryInfo(context)
             delay(1500)
         }
@@ -258,164 +250,7 @@ fun DeviceControlScreen(
                 )
             }
 
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    color = JarvisSurface,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (isFloatingBubbleRunning) JarvisAccentCyan.copy(alpha = 0.8f) else JarvisBorder
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (isFloatingBubbleRunning) JarvisAccentCyan.copy(alpha = 0.2f) else JarvisSurfaceVariant
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.BubbleChart,
-                                        contentDescription = null,
-                                        tint = if (isFloatingBubbleRunning) JarvisAccentCyan else JarvisTextSecondary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
 
-                                Column {
-                                    Text(
-                                        text = "Botón flotante en pantalla",
-                                        color = JarvisTextPrimary,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    Text(
-                                        text = if (isFloatingBubbleRunning) "ACTIVA EN PANTALLA" else if (isOverlayPermissionGranted) "LISTA PARA INICIAR" else "PERMISO REQUERIDO",
-                                        color = if (isFloatingBubbleRunning) JarvisAccentCyan else if (isOverlayPermissionGranted) JarvisAccentGreen else JarvisAccentOrange,
-                                        fontSize = 10.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Switch(
-                                checked = isFloatingBubbleRunning,
-                                onCheckedChange = { enable ->
-                                    if (enable) {
-                                        if (isOverlayPermissionGranted) {
-                                            com.example.jarvisai.data.service.JarvisFloatingBubbleService.start(context)
-                                            isFloatingBubbleRunning = true
-                                        } else {
-                                            DeviceController.openOverlaySettings(context)
-                                        }
-                                    } else {
-                                        com.example.jarvisai.data.service.JarvisFloatingBubbleService.stop(context)
-                                        isFloatingBubbleRunning = false
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = JarvisBackground,
-                                    checkedTrackColor = JarvisAccentCyan,
-                                    uncheckedThumbColor = JarvisTextSecondary,
-                                    uncheckedTrackColor = JarvisSurfaceVariant
-                                )
-                            )
-                        }
-
-                        Text(
-                            text = "Muestra un botón flotante para hablar o interactuar con el asistente sin salir de tus otras aplicaciones.",
-                            color = JarvisTextSecondary,
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
-                        )
-
-                        if (!isOverlayPermissionGranted) {
-                            Surface(
-                                onClick = {
-                                    DeviceController.openOverlaySettings(context)
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                color = JarvisAccentOrange.copy(alpha = 0.15f),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentOrange),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp, horizontal = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "⚠️ Conceder permiso de superposición",
-                                        color = JarvisAccentOrange,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "HABILITAR →",
-                                        color = JarvisAccentOrange,
-                                        fontSize = 10.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        if (isFloatingBubbleRunning) {
-                                            com.example.jarvisai.data.service.JarvisFloatingBubbleService.stop(context)
-                                            isFloatingBubbleRunning = false
-                                        } else {
-                                            com.example.jarvisai.data.service.JarvisFloatingBubbleService.start(context)
-                                            isFloatingBubbleRunning = true
-                                        }
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isFloatingBubbleRunning) JarvisAccentRed.copy(alpha = 0.2f) else JarvisPrimary,
-                                        contentColor = if (isFloatingBubbleRunning) JarvisAccentRed else Color(0xFF030712)
-                                    ),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = if (isFloatingBubbleRunning) "DETENER BURBUJA" else "LANZAR BURBUJA AHORA",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
 
             // System Default Assistant Card
             item {
