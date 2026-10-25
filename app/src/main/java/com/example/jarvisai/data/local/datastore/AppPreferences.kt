@@ -33,6 +33,7 @@ class AppPreferences(private val context: Context) {
 
     private object Keys {
         val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+        val NVIDIA_API_KEY = stringPreferencesKey("nvidia_api_key")
         val OPENROUTER_API_KEY = stringPreferencesKey("openrouter_api_key")
         val OPENAI_API_KEY = stringPreferencesKey("openai_api_key")
         val DEEPSEEK_API_KEY = stringPreferencesKey("deepseek_api_key")
@@ -82,6 +83,7 @@ class AppPreferences(private val context: Context) {
     val keyDecryptionError: Flow<Boolean> = safePreferences.map { preferences ->
         val encryptedValues = listOfNotNull(
             preferences[Keys.GEMINI_API_KEY],
+            preferences[Keys.NVIDIA_API_KEY],
             preferences[Keys.OPENROUTER_API_KEY],
             preferences[Keys.OPENAI_API_KEY],
             preferences[Keys.DEEPSEEK_API_KEY],
@@ -96,13 +98,14 @@ class AppPreferences(private val context: Context) {
     fun getProviderApiKey(providerId: String): Flow<String?> = safePreferences.map { preferences ->
         when (providerId.lowercase()) {
             "gemini" -> secret(preferences[Keys.GEMINI_API_KEY])
+            "nvidia" -> secret(preferences[Keys.NVIDIA_API_KEY])
             "openrouter" -> secret(preferences[Keys.OPENROUTER_API_KEY])
             "openai" -> secret(preferences[Keys.OPENAI_API_KEY])
             "deepseek" -> secret(preferences[Keys.DEEPSEEK_API_KEY])
             "groq" -> secret(preferences[Keys.GROQ_API_KEY])
             "anthropic" -> secret(preferences[Keys.ANTHROPIC_API_KEY])
             "custom" -> secret(preferences[Keys.CUSTOM_API_KEY])
-            else -> secret(preferences[Keys.GEMINI_API_KEY])
+            else -> null
         }
     }
 
@@ -113,6 +116,7 @@ class AppPreferences(private val context: Context) {
     val allProviderApiKeys: Flow<Map<String, String>> = safePreferences.map { preferences ->
         buildMap {
             secret(preferences[Keys.GEMINI_API_KEY])?.let { put("gemini", it) }
+            secret(preferences[Keys.NVIDIA_API_KEY])?.let { put("nvidia", it) }
             secret(preferences[Keys.OPENROUTER_API_KEY])?.let { put("openrouter", it) }
             secret(preferences[Keys.OPENAI_API_KEY])?.let { put("openai", it) }
             secret(preferences[Keys.DEEPSEEK_API_KEY])?.let { put("deepseek", it) }
@@ -215,13 +219,14 @@ class AppPreferences(private val context: Context) {
         dataStore.edit { preferences ->
             val key = when (providerId.lowercase()) {
                 "gemini" -> Keys.GEMINI_API_KEY
+                "nvidia" -> Keys.NVIDIA_API_KEY
                 "openrouter" -> Keys.OPENROUTER_API_KEY
                 "openai" -> Keys.OPENAI_API_KEY
                 "deepseek" -> Keys.DEEPSEEK_API_KEY
                 "groq" -> Keys.GROQ_API_KEY
                 "anthropic" -> Keys.ANTHROPIC_API_KEY
                 "custom" -> Keys.CUSTOM_API_KEY
-                else -> Keys.GEMINI_API_KEY
+                else -> throw IllegalArgumentException("Unknown AI provider: $providerId")
             }
             if (apiKey.isBlank()) {
                 preferences.remove(key)
