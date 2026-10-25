@@ -142,7 +142,7 @@
             android:name="com.example.jarvisai.data.service.JarvisLiveVoiceService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="microphone|mediaProjection" />
+            android:foregroundServiceType="microphone" />
 
 
 

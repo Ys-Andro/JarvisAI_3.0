@@ -35,40 +35,27 @@ class ActionParser {
                     } catch (_: Exception) { "" }
 
                     // Verifica que la acción corresponda realmente a la intención del mensaje del usuario
-                    if (!isActionRelevantToPrompt(actionName, jsonPayload, userPrompt)) {
+                    val relevant = isActionRelevantToPrompt(actionName, jsonPayload, userPrompt)
+                    val normalized = try {
+                        java.text.Normalizer.normalize(userPrompt ?: "", java.text.Normalizer.Form.NFD)
+                            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+                            .lowercase()
+                    } catch (e: Exception) { "error" }
+                    android.util.Log.d("ActionParserDebug", "Action: $actionName, Relevant: $relevant, UserPrompt: $userPrompt, Normalized: $normalized")
+                    if (!relevant) {
                         if (com.example.BuildConfig.DEBUG) {
-                            Log.w(TAG, "Omitiendo acción no solicitada explícitamente en el mensaje actual: $actionName")
+                            Log.w(TAG, "Omitiendo acción no solicitada explícitamente en el mensaje actual: $actionName. Prompt: $userPrompt")
                         }
                         continue
                     }
 
                     val isSensitive = ActionRegistry.isSensitive(actionName)
 
-                    // Requirement 4: Si el turno incluyó contenido externo, toda acción sensible exige confirmación
                     val execResult = executor.executeActionJson(
                         jsonString = jsonPayload,
                         skipConfirmation = false,
                         hasExternalContent = turnHasExternalContent
-                    ).let { result ->
-                        if (turnHasExternalContent && isSensitive && result is ActionExecutionResult.Success) {
-                            val params = try {
-                                val json = JSONObject(jsonPayload)
-                                val map = mutableMapOf<String, Any>()
-                                val keys = json.keys()
-                                while (keys.hasNext()) {
-                                    val k = keys.next()
-                                    if (k != "action") map[k] = json.get(k)
-                                }
-                                map
-                            } catch (_: Exception) { emptyMap() }
-                            ActionExecutionResult.RequiresConfirmation(
-                                action = ActionRequest(actionName, params, confirmationRequired = true),
-                                prompt = "La acción $actionName es sensible y requiere confirmación obligatoria porque el turno incluye contenido externo no confiable."
-                            )
-                        } else {
-                            result
-                        }
-                    }
+                    )
 
                     when (execResult) {
                         is ActionExecutionResult.Success -> onResult("\n\n✓ ${execResult.message}")
@@ -92,44 +79,75 @@ class ActionParser {
     /**
      * Valida que la acción extraída tenga relación directa con la solicitud más reciente del usuario,
      * previniendo que modelos de IA repitan acciones previas (como abrir WhatsApp) por inercia o historial.
+     * Nota: Esto es una heurística de filtrado y no una barrera de seguridad infalible.
      */
     fun isActionRelevantToPrompt(actionName: String, jsonPayload: String, userPrompt: String?): Boolean {
-        if (userPrompt.isNullOrBlank()) return true
-        val prompt = userPrompt.lowercase()
+        val isSensitive = ActionRegistry.isSensitive(actionName)
+        if (userPrompt.isNullOrBlank()) {
+            // Fail closed for sensitive actions if userPrompt is missing, keep current behavior for non-sensitive actions
+            return !isSensitive
+        }
+
+        // Normalize prompt: lowercase and strip diacritics/accents
+        val normalizedPrompt = java.text.Normalizer.normalize(userPrompt, java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+            .lowercase()
+
         return when (actionName) {
             "OPEN_APP" -> {
                 val appName = try { JSONObject(jsonPayload).optString("appName", "") } catch (_: Exception) { "" }.lowercase()
                 val pkgName = try { JSONObject(jsonPayload).optString("packageName", "") } catch (_: Exception) { "" }.lowercase()
-                val hasOpenVerb = listOf("abre", "abrir", "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar", "entra", "entrar", "open", "launch").any { prompt.contains(it) }
-                val mentionsApp = (appName.isNotBlank() && prompt.contains(appName)) || (pkgName.isNotBlank() && prompt.contains(pkgName))
+                val hasOpenVerb = listOf("abre", "abrir", "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar", "entra", "entrar", "open", "launch").any { normalizedPrompt.contains(it) }
+                val mentionsApp = (appName.isNotBlank() && normalizedPrompt.contains(appName)) || (pkgName.isNotBlank() && normalizedPrompt.contains(pkgName))
                 hasOpenVerb || mentionsApp
             }
             "CALL" -> {
-                listOf("llama", "llamar", "llamada", "marca", "marcar", "telefono", "teléfono", "call").any { prompt.contains(it) }
+                listOf("llama", "llamar", "llamada", "marca", "marcar", "telefono", "telefono", "call").any { normalizedPrompt.contains(it) }
             }
             "WHATSAPP_MESSAGE" -> {
-                listOf("whatsapp", "watsap", "wasap", "whats").any { prompt.contains(it) }
+                listOf("whatsapp", "watsap", "wasap", "whats", "mensaje").any { normalizedPrompt.contains(it) }
             }
             "FLASHLIGHT" -> {
-                listOf("linterna", "flash", "luz", "ilumina", "enciende la luz", "apaga la luz").any { prompt.contains(it) }
+                listOf("linterna", "flash", "luz", "ilumina", "enciende", "apaga").any { normalizedPrompt.contains(it) }
             }
             "VOLUME", "MUTE" -> {
-                listOf("volumen", "sonido", "mute", "silencio", "silencia", "sube", "baja", "audio").any { prompt.contains(it) }
+                listOf("volumen", "sonido", "mute", "silencio", "silencia", "sube", "baja", "audio").any { normalizedPrompt.contains(it) }
             }
             "SET_ALARM" -> {
-                listOf("alarma", "despiertame", "despiértame", "despertar", "alarm").any { prompt.contains(it) }
+                listOf("alarma", "despiertame", "despertar", "alarm").any { normalizedPrompt.contains(it) }
             }
             "SET_TIMER" -> {
-                listOf("temporizador", "timer", "cronometro", "cronómetro", "cuenta regresiva").any { prompt.contains(it) }
+                listOf("temporizador", "timer", "cronometro", "cuenta regresiva").any { normalizedPrompt.contains(it) }
             }
             "LOCK_SCREEN" -> {
-                listOf("bloquea", "bloquear", "apaga pantalla", "lock").any { prompt.contains(it) }
+                listOf("bloquea", "bloquear", "apaga pantalla", "lock").any { normalizedPrompt.contains(it) }
             }
             "SCREENSHOT" -> {
-                listOf("captura", "pantallazo", "screenshot").any { prompt.contains(it) }
+                listOf("captura", "pantallazo", "screenshot").any { normalizedPrompt.contains(it) }
             }
             "READ_SCREEN" -> {
-                listOf("lee la pantalla", "que hay en la pantalla", "qué hay en la pantalla", "lee pantalla").any { prompt.contains(it) }
+                listOf("lee la pantalla", "que hay en la pantalla", "lee pantalla").any { normalizedPrompt.contains(it) }
+            }
+            "OPEN_URL" -> {
+                listOf("abre url", "enlace", "link", "sitio", "web", "pagina", "navega", "open url").any { normalizedPrompt.contains(it) }
+            }
+            "SAVE_MEMORY" -> {
+                listOf("guarda", "recuerda", "memoria", "anota", "memoriza", "save", "remember").any { normalizedPrompt.contains(it) }
+            }
+            "DELETE_MEMORY" -> {
+                listOf("borra", "elimina", "olvida", "memoria", "delete", "forget").any { normalizedPrompt.contains(it) }
+            }
+            "TYPE_TEXT" -> {
+                listOf("escribe", "teclea", "type", "text", "redacta").any { normalizedPrompt.contains(it) }
+            }
+            "CLICK_TEXT" -> {
+                listOf("haz click", "presiona", "toca", "pulsar", "click", "tap").any { normalizedPrompt.contains(it) }
+            }
+            "READ_NOTIFICATIONS" -> {
+                listOf("notificaciones", "mensajes nuevos", "avisos", "notifications", "lee").any { normalizedPrompt.contains(it) }
+            }
+            "SCHEDULE_ACTION" -> {
+                listOf("programa", "automatiza", "automatizacion", "recuerdame", "schedule", "automate").any { normalizedPrompt.contains(it) }
             }
             else -> true
         }

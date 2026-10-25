@@ -169,7 +169,15 @@ class JarvisLiveVoiceService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
                 if (hasActiveProjection) {
-                    types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        try {
+                            types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                        } catch (e: Exception) {
+                            Log.w(TAG, "MediaProjection foreground type not allowed without token: ${e.message}")
+                        }
+                    } else {
+                        types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                    }
                 }
                 ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, types)
             } else {

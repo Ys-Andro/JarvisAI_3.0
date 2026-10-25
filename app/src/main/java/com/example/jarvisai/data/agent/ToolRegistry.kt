@@ -46,7 +46,7 @@ class ToolRegistry(
                     val docs = documentRepository.getAllDocuments().first()
                     val memories = memoryRepository.getAllMemories().first()
                     val context = contextProvider.buildAugmentedContext(input, docs, memories)
-                    ToolExecutionResult(success = true, output = context.ifBlank { "No se encontró contexto relevante." })
+                    ToolExecutionResult(success = true, output = context.ifBlank { "No se encontró contexto relevante." }, isExternal = true)
                 }
                 "CURRENT_DATETIME" -> {
                     val result = actionExecutor.executeActionJson("""{"action":"GET_CURRENT_DATETIME"}""")
@@ -59,7 +59,11 @@ class ToolRegistry(
                 }
                 "ACTION", "DEVICE_CONTROL" -> {
                     when (val result = actionExecutor.executeActionJson(input)) {
-                        is ActionExecutionResult.Success -> ToolExecutionResult(true, "Éxito: ${result.message}")
+                        is ActionExecutionResult.Success -> {
+                            val actionUpper = try { org.json.JSONObject(input).optString("action", "").uppercase() } catch (_: Exception) { "" }
+                            val isExternalAction = actionUpper == "READ_SCREEN" || actionUpper == "READ_NOTIFICATIONS" || actionUpper == "GET_NOTIFICATIONS"
+                            ToolExecutionResult(true, "Éxito: ${result.message}", isExternal = isExternalAction)
+                        }
                         is ActionExecutionResult.Error -> ToolExecutionResult(false, error = result.reason)
                         is ActionExecutionResult.Denied -> ToolExecutionResult(false, error = "Acción denegada: ${result.reason}")
                         is ActionExecutionResult.RequiresConfirmation -> ToolExecutionResult(

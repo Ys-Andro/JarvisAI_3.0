@@ -1,6 +1,3 @@
-import java.util.Properties
-import java.io.FileInputStream
-
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -23,48 +20,23 @@ android {
       .get()
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-  }
-
-  fun getDebugGeminiApiKey(): String {
-    val envFile = rootProject.file(".env")
-    if (envFile.exists()) {
-      val props = Properties()
-      FileInputStream(envFile).use { props.load(it) }
-      val key = props.getProperty("GEMINI_API_KEY")
-      if (!key.isNullOrBlank()) return key
-    }
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-      val props = Properties()
-      FileInputStream(localPropertiesFile).use { props.load(it) }
-      val key = props.getProperty("GEMINI_API_KEY")
-      if (!key.isNullOrBlank()) return key
-    }
-    val envVar = System.getenv("GEMINI_API_KEY")
-    if (!envVar.isNullOrBlank()) return envVar
-    return ""
+    buildConfigField("String", "GEMINI_API_KEY", "\"\"")
   }
 
   secrets {
     propertiesFileName = ".env"
     defaultPropertiesFileName = ".env.example"
-    ignoreList.add("GEMINI_API_KEY")
   }
 
-  val isCi = System.getenv("CI")?.equals("true", ignoreCase = true) == true ||
-             System.getenv("GITHUB_ACTIONS") != null
-
   signingConfigs {
-    val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/release.keystore"
+    val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
     val releaseKeystoreFile = file(keystorePath)
     create("release") {
       if (releaseKeystoreFile.exists()) {
         storeFile = releaseKeystoreFile
-        storePassword = System.getenv("STORE_PASSWORD") ?: "android"
-        keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
-        keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "android"
-      } else if (isCi) {
-        throw GradleException("Release keystore not found in CI environment at ${releaseKeystoreFile.absolutePath}")
+        storePassword = System.getenv("STORE_PASSWORD")
+        keyAlias = "upload"
+        keyPassword = System.getenv("KEY_PASSWORD")
       } else {
         storeFile = file("${rootDir}/debug.keystore")
         storePassword = "android"
@@ -82,16 +54,12 @@ android {
 
   buildTypes {
     release {
-      buildConfigField("String", "GEMINI_API_KEY", "\"\"")
       isCrunchPngs = false
-      isMinifyEnabled = true
-      isShrinkResources = true
+      isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      val debugKey = getDebugGeminiApiKey()
-      buildConfigField("String", "GEMINI_API_KEY", "\"$debugKey\"")
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }

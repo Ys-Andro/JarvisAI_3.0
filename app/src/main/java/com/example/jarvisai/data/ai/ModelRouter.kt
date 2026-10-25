@@ -18,7 +18,7 @@ class ModelRouter(
 
         fun add(id: String) {
             val model = CloudAiModel.ALL_MODELS.firstOrNull { it.id == id } ?: return
-            if (result.none { it.id == model.id } && (model.id == "local-qwen-hf" || configured[model.provider.id].orEmpty().isNotBlank())) {
+            if (result.none { it.id == model.id } && configured[model.provider.id].orEmpty().isNotBlank()) {
                 result += model
             }
         }
@@ -27,7 +27,6 @@ class ModelRouter(
         add("gemini-3.6-flash")
         add("openai/gpt-oss-20b")
         add("openrouter/auto")
-        add("local-qwen-hf")
         return result.take(4)
     }
 }

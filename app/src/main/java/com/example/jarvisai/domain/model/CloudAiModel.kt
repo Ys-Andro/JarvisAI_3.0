@@ -24,14 +24,6 @@ data class CloudAiModel(
 ) {
     companion object {
         val ALL_MODELS = listOf(
-            CloudAiModel(
-                id = "local-qwen-hf",
-                provider = ModelProvider.CUSTOM_OPENAI,
-                name = "Qwen Local/Offline",
-                description = "Qwen 0.5B GGUF servido por llama-server en Hugging Face y accesible mediante API OpenAI-compatible.",
-                defaultContextLength = 4096,
-                supportsVision = false
-            ),
             // Google Gemini (Default Model: gemini-3.6-flash)
             CloudAiModel(
                 id = "gemini-3.6-flash",

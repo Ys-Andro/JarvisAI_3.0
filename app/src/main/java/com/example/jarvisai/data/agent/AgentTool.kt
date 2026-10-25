@@ -14,5 +14,6 @@ data class ToolExecutionResult(
     val output: String = "",
     val error: String? = null,
     val requiresConfirmation: Boolean = false,
-    val actionRequest: ActionRequest? = null
+    val actionRequest: ActionRequest? = null,
+    val isExternal: Boolean = false
 )

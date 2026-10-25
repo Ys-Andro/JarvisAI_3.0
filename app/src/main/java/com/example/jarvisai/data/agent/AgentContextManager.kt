@@ -180,12 +180,14 @@ data class AgentContextSnapshot(
 
         fun isExternalContent(text: String): Boolean {
             val lower = text.lowercase()
-            return lower.contains("notificaci") ||
+            return lower.contains("<untrusted_content>") ||
+                   lower.contains("fuente externa") ||
+                   lower.contains("[external]") ||
+                   lower.contains("notificación") ||
                    lower.contains("notification") ||
-                   lower.contains("pantalla") ||
-                   lower.contains("screen") ||
-                   lower.contains("document") ||
-                   lower.contains("rag")
+                   lower.contains("pantalla capturada") ||
+                   lower.contains("screen capture") ||
+                   lower.contains("contenido rag")
         }
     }
 }

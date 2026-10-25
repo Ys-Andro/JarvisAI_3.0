@@ -97,9 +97,7 @@ class UniversalAiApiClient(
             }
             else -> {
                 // OpenAI, DeepSeek, Groq, Custom OpenAI-compatible
-                val baseUrl = if (model.id == "local-qwen-hf") {
-                    "https://ysandro0615-jarvisai-offline.hf.space/v1"
-                } else if (!customBaseUrl.isNullOrBlank()) {
+                val baseUrl = if (!customBaseUrl.isNullOrBlank()) {
                     customBaseUrl.trimEnd('/')
                 } else {
                     model.provider.defaultEndpoint
@@ -224,7 +222,6 @@ class UniversalAiApiClient(
 
             reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))
             var line: String?
-            var firstQwenContentChunk = modelId == "local-qwen-hf"
 
             while (currentCoroutineContext().isActive) {
                 line = reader.readLine() ?: break
@@ -238,11 +235,7 @@ class UniversalAiApiClient(
                             val choices = json.optJSONArray("choices")
                             if (choices != null && choices.length() > 0) {
                                 val delta = choices.getJSONObject(0).optJSONObject("delta")
-                                var text = delta?.optString("content", "") ?: ""
-                                if (firstQwenContentChunk && text.isNotEmpty()) {
-                                    text = text.replace(Regex("^(?i:null\\s*)+"), "")
-                                    firstQwenContentChunk = false
-                                }
+                                val text = delta?.optString("content", "") ?: ""
                                 if (text.isNotEmpty()) {
                                     emit(text)
                                 }

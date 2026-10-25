@@ -180,7 +180,6 @@ class LiveVoiceBackgroundLifecycleTest {
         assertFalse(com.example.jarvisai.domain.model.CloudAiModel.supportsVision("deepseek-reasoner"))
         assertFalse(com.example.jarvisai.domain.model.CloudAiModel.supportsVision("openai/gpt-oss-120b"))
         assertFalse(com.example.jarvisai.domain.model.CloudAiModel.supportsVision("openai/gpt-oss-20b"))
-        assertFalse(com.example.jarvisai.domain.model.CloudAiModel.supportsVision("local-qwen-hf"))
         assertFalse(com.example.jarvisai.domain.model.CloudAiModel.supportsVision("meta-llama/llama-3.3-70b-instruct"))
     }
 
