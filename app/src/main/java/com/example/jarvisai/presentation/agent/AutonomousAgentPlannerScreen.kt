@@ -251,6 +251,7 @@ fun AutonomousAgentPlannerScreen(
                                             when (task.status) {
                                                 com.example.jarvisai.data.agent.TaskStatus.COMPLETED -> JarvisAccentGreen.copy(alpha = 0.2f)
                                                 com.example.jarvisai.data.agent.TaskStatus.RUNNING -> JarvisAccentCyan.copy(alpha = 0.2f)
+                                                com.example.jarvisai.data.agent.TaskStatus.WAITING_CONFIRMATION -> JarvisAccentOrange.copy(alpha = 0.25f)
                                                 com.example.jarvisai.data.agent.TaskStatus.FAILED -> JarvisAccentRed.copy(alpha = 0.2f)
                                                 else -> JarvisSurfaceVariant
                                             }
@@ -298,6 +299,7 @@ fun AutonomousAgentPlannerScreen(
                                             color = when (task.status) {
                                                 com.example.jarvisai.data.agent.TaskStatus.COMPLETED -> JarvisAccentGreen
                                                 com.example.jarvisai.data.agent.TaskStatus.RUNNING -> JarvisAccentCyan
+                                                com.example.jarvisai.data.agent.TaskStatus.WAITING_CONFIRMATION -> JarvisAccentOrange
                                                 com.example.jarvisai.data.agent.TaskStatus.FAILED -> JarvisAccentRed
                                                 else -> JarvisTextTertiary
                                             },
@@ -401,5 +403,14 @@ fun AutonomousAgentPlannerScreen(
                 }
             }
         }
+    }
+
+    val pendingAction = uiState.pendingActionConfirmation
+    if (pendingAction != null) {
+        com.example.jarvisai.presentation.chat.components.ActionConfirmationDialog(
+            request = pendingAction,
+            onConfirm = viewModel::confirmPendingAction,
+            onCancel = viewModel::cancelPendingAction
+        )
     }
 }

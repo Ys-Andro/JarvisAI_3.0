@@ -16,6 +16,7 @@ data class ModelsUiState(
     val appTheme: AppThemeMode = AppThemeMode.DARK_JARVIS,
     val hotwordSensitivity: String = "LOW",
     val hotwordAutoLaunchApp: Boolean = true,
+    val keyDecryptionError: Boolean = false,
     val statusMessage: String? = null,
     val errorMessage: String? = null
 )

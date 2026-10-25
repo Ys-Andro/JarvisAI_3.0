@@ -145,6 +145,32 @@ class SharedTodoRepository(private val db: FirebaseFirestore) {
         }
     }
 
+    suspend fun removeMemberFromList(listId: String, memberUid: String) {
+        val docRef = db.collection("todo_lists").document(listId)
+        try {
+            docRef.update(
+                mapOf(
+                    "memberUids" to FieldValue.arrayRemove(memberUid.trim()),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+
+            // Propagate member removal to tasks
+            val tasksSnapshot = docRef.collection("tasks").get().await()
+            for (taskDoc in tasksSnapshot.documents) {
+                taskDoc.reference.update(
+                    mapOf(
+                        "memberUids" to FieldValue.arrayRemove(memberUid.trim()),
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            }
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docRef.path)
+            throw e
+        }
+    }
+
     suspend fun deleteTodoList(listId: String) {
         val uid = requireUserId()
         val docRef = db.collection("todo_lists").document(listId)

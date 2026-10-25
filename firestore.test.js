@@ -139,3 +139,69 @@ test("Task operations: member can add task and update task", async () => {
     charlieDb.collection("todo_lists").doc("list_1").collection("tasks").doc("task_1").get()
   );
 });
+
+test("Security: Non-member cannot create tasks", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("todo_lists").doc("list_secure").set({
+      title: "Private Project",
+      ownerId: ALICE_UID,
+      ownerEmail: "alice@example.com",
+      memberUids: [ALICE_UID, BOB_UID],
+      createdAt: new Date(),
+    });
+  });
+
+  const charlieDb = testEnv.authenticatedContext(CHARLIE_UID).firestore();
+  await assertFails(
+    charlieDb.collection("todo_lists").doc("list_secure").collection("tasks").doc("task_charlie").set({
+      listId: "list_secure",
+      title: "Unauthorized Task",
+      completed: false,
+      priority: "MEDIUM",
+      createdByUid: CHARLIE_UID,
+      memberUids: [ALICE_UID, BOB_UID],
+      createdAt: new Date(),
+    })
+  );
+});
+
+test("Security: Member cannot modify memberUids, but Owner can", async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await context.firestore().collection("todo_lists").doc("list_collab").set({
+      title: "Collab Project",
+      ownerId: ALICE_UID,
+      ownerEmail: "alice@example.com",
+      memberUids: [ALICE_UID, BOB_UID],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  });
+
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+
+  // Member Bob cannot add Charlie to memberUids
+  await assertFails(
+    bobDb.collection("todo_lists").doc("list_collab").update({
+      memberUids: [ALICE_UID, BOB_UID, CHARLIE_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Owner Alice CAN add Charlie to memberUids
+  await assertSucceeds(
+    aliceDb.collection("todo_lists").doc("list_collab").update({
+      memberUids: [ALICE_UID, BOB_UID, CHARLIE_UID],
+      updatedAt: new Date(),
+    })
+  );
+
+  // Member Charlie can remove themselves (self-removal)
+  const charlieDb = testEnv.authenticatedContext(CHARLIE_UID).firestore();
+  await assertSucceeds(
+    charlieDb.collection("todo_lists").doc("list_collab").update({
+      memberUids: [ALICE_UID, BOB_UID],
+      updatedAt: new Date(),
+    })
+  );
+});

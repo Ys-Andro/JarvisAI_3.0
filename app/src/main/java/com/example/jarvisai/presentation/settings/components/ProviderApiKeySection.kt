@@ -288,6 +288,38 @@ fun ProviderApiKeySection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        if (uiState.keyDecryptionError) {
+            Surface(
+                color = JarvisAccentRed.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(10.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, JarvisAccentRed),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+                    .testTag("key_decryption_error_banner")
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = null,
+                        tint = JarvisAccentRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Tu clave no se pudo recuperar, ingrésala de nuevo",
+                        color = JarvisAccentRed,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
         // API Key input
         OutlinedTextField(
             value = keyInput,

@@ -13,6 +13,14 @@ class TaskExecutor(
             withTimeout(15000L) {
                 val result = toolRegistry.executeToolResult(task.toolName, task.toolInput)
                 if (!result.success) {
+                    if (result.requiresConfirmation) {
+                        return@withTimeout task.copy(
+                            status = TaskStatus.WAITING_CONFIRMATION,
+                            error = result.error ?: "Requiere confirmación del usuario.",
+                            lastObservation = result.error ?: "Requiere confirmación del usuario.",
+                            pendingAction = result.actionRequest
+                        )
+                    }
                     return@withTimeout if (task.retryCount < task.maxRetries) {
                         task.copy(
                             status = TaskStatus.PENDING,

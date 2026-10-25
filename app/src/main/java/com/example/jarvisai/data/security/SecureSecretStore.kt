@@ -54,6 +54,17 @@ object SecureSecretStore {
         }
     }
 
+    private val _decryptionErrorOccurred = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val decryptionErrorOccurred: kotlinx.coroutines.flow.StateFlow<Boolean> = _decryptionErrorOccurred
+
+    fun clearDecryptionError() {
+        _decryptionErrorOccurred.value = false
+    }
+
+    fun setDecryptionError(occurred: Boolean) {
+        _decryptionErrorOccurred.value = occurred
+    }
+
     fun decrypt(value: String?): String? {
         if (value.isNullOrBlank()) return value
         if (!value.startsWith(PREFIX)) return value
@@ -66,6 +77,7 @@ object SecureSecretStore {
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
             String(cipher.doFinal(ciphertext), Charsets.UTF_8)
         } catch (_: Throwable) {
+            _decryptionErrorOccurred.value = true
             null
         }
     }

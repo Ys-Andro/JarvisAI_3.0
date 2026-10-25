@@ -21,7 +21,8 @@ class ActionExecutor(
     ): ActionExecutionResult {
         return try {
             val json = JSONObject(jsonString)
-            val actionName = json.optString("action")
+            val rawActionName = json.optString("action")
+            val actionName = ActionRegistry.canonicalName(rawActionName)
             val params = mutableMapOf<String, Any>()
             val keys = json.keys()
             while (keys.hasNext()) {
@@ -37,11 +38,12 @@ class ActionExecutor(
             }
 
             val request = validationResult.getOrThrow()
-            val isSensitive = ActionRegistry.isSensitive(request.action)
+            val canonicalAction = ActionRegistry.canonicalName(request.action)
+            val isSensitive = ActionRegistry.isSensitive(canonicalAction)
             // If turn included external content, every sensitive action MUST require confirmation
             val effectiveSkipConfirmation = if (hasExternalContent && isSensitive) false else skipConfirmation
 
-            if (!effectiveSkipConfirmation) {
+            if (!effectiveSkipConfirmation && request.action != "SCHEDULE_ACTION") {
                 val policyResult = policy.evaluate(request, hasExternalContent)
                 if (policyResult is ActionExecutionResult.Denied || policyResult is ActionExecutionResult.RequiresConfirmation) {
                     return policyResult
@@ -63,12 +65,42 @@ class ActionExecutor(
                     if (triggerAt <= System.currentTimeMillis() || actionJson.isBlank()) {
                         return ActionExecutionResult.Error("SCHEDULE_ACTION requiere triggerAt futuro o delaySeconds y un actionJson válido.")
                     }
+
+                    // Valida actionJson con ActionValidator y rechaza SCHEDULE_ACTION anidado
+                    val innerJson = try {
+                        JSONObject(actionJson)
+                    } catch (e: Exception) {
+                        return ActionExecutionResult.Error("actionJson no es un JSON válido: ${e.message}")
+                    }
+                    val innerRawAction = innerJson.optString("action").trim()
+                    if (innerRawAction.isBlank()) {
+                        return ActionExecutionResult.Error("actionJson debe especificar una acción válida.")
+                    }
+                    val innerCanonical = ActionRegistry.canonicalName(innerRawAction)
+                    if (innerCanonical == "SCHEDULE_ACTION") {
+                        return ActionExecutionResult.Error("No se permite programar un SCHEDULE_ACTION anidado.")
+                    }
+
+                    val innerParams = mutableMapOf<String, Any>()
+                    val innerKeys = innerJson.keys()
+                    while (innerKeys.hasNext()) {
+                        val key = innerKeys.next()
+                        if (key != "action") {
+                            innerParams[key] = innerJson.get(key)
+                        }
+                    }
+
+                    val innerValidation = validator.validate(innerCanonical, innerParams)
+                    if (innerValidation.isFailure) {
+                        return ActionExecutionResult.Error("actionJson inválido: ${innerValidation.exceptionOrNull()?.message}")
+                    }
+                    val validatedInner = innerValidation.getOrThrow()
+
                     if (!effectiveSkipConfirmation) {
-                        val scheduledAction = try { JSONObject(actionJson).optString("action").uppercase() } catch (_: Exception) { "" }
-                        if (ActionRegistry.isSensitive(scheduledAction)) {
+                        if (ActionRegistry.isSensitive(validatedInner.action)) {
                             return ActionExecutionResult.RequiresConfirmation(
                                 request,
-                                "La automatización contiene una acción sensible ($scheduledAction) y requiere confirmación explícita."
+                                "La automatización contiene una acción sensible (${validatedInner.action}) y requiere confirmación explícita."
                             )
                         }
                     }
@@ -136,8 +168,9 @@ class ActionExecutor(
     }
 
     suspend fun executeConfirmed(request: ActionRequest): ActionExecutionResult {
+        val canonicalAction = ActionRegistry.canonicalName(request.action)
         val paramsWithAction = request.parameters.toMutableMap()
-        paramsWithAction["action"] = request.action
+        paramsWithAction["action"] = canonicalAction
         val jsonString = JSONObject(paramsWithAction).toString()
         return executeActionJson(jsonString, skipConfirmation = true)
     }

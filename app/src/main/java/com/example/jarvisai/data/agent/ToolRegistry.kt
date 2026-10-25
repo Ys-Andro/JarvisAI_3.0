@@ -54,7 +54,7 @@ class ToolRegistry(
                         is ActionExecutionResult.Success -> ToolExecutionResult(true, result.message)
                         is ActionExecutionResult.Error -> ToolExecutionResult(false, error = result.reason)
                         is ActionExecutionResult.Denied -> ToolExecutionResult(false, error = "Acción denegada: ${result.reason}")
-                        is ActionExecutionResult.RequiresConfirmation -> ToolExecutionResult(false, error = result.prompt, requiresConfirmation = true)
+                        is ActionExecutionResult.RequiresConfirmation -> ToolExecutionResult(false, error = result.prompt, requiresConfirmation = true, actionRequest = result.action)
                     }
                 }
                 "ACTION", "DEVICE_CONTROL" -> {
@@ -65,7 +65,8 @@ class ToolRegistry(
                         is ActionExecutionResult.RequiresConfirmation -> ToolExecutionResult(
                             success = false,
                             error = "La acción requiere confirmación: ${result.prompt}",
-                            requiresConfirmation = true
+                            requiresConfirmation = true,
+                            actionRequest = result.action
                         )
                     }
                 }

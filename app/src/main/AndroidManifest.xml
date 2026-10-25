@@ -157,6 +157,10 @@
                 android:resource="@xml/jarvis_app_widget_info" />
         </receiver>
 
+        <receiver
+            android:name="com.example.jarvisai.data.automation.AutomationApprovalReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

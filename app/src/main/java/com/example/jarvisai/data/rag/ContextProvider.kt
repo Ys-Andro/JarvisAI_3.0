@@ -1,5 +1,6 @@
 package com.example.jarvisai.data.rag
 
+import com.example.jarvisai.data.util.UntrustedContentSanitizer
 import com.example.jarvisai.domain.model.DocumentItem
 import com.example.jarvisai.domain.model.MemoryItem
 
@@ -18,7 +19,9 @@ class ContextProvider(
                 buildString {
                     append("\n\n[MEMORIAS RELEVANTES DEL NÚCLEO]:\n")
                     for (m in selectedMemories) {
-                        append("- [ID ${m.id}] ${m.key}: ${m.value} (${m.category})\n")
+                        val safeKey = UntrustedContentSanitizer.escape(m.key)
+                        val safeVal = UntrustedContentSanitizer.escape(m.value)
+                        append("- [ID ${m.id}] $safeKey: <untrusted_content>$safeVal</untrusted_content> (${m.category})\n")
                     }
                 }
             } else ""
@@ -27,11 +30,13 @@ class ContextProvider(
                 buildString {
                     append("\n\n[FRAGMENTOS DE DOCUMENTOS RECUPERADOS (RAG TOP-K)]: \n")
                     for (chunk in chunks) {
-                        append("\n=== DOCUMENTO: \"${chunk.documentTitle}\" (Fragmento ${chunk.chunkIndex + 1}) ===\n")
-                        append("<untrusted_content>\n")
-                        append(chunk.content)
-                        append("\n</untrusted_content>")
-                        append("\n==================================================")
+                        val safeTitle = UntrustedContentSanitizer.escape(chunk.documentTitle)
+                        val safeContent = UntrustedContentSanitizer.escape(chunk.content)
+                        append("\n<untrusted_content>\n")
+                        append("=== DOCUMENTO: \"$safeTitle\" (Fragmento ${chunk.chunkIndex + 1}) ===\n")
+                        append(safeContent)
+                        append("\n</untrusted_content>\n")
+                        append("==================================================")
                     }
                 }
             } else ""
@@ -43,13 +48,17 @@ class ContextProvider(
                 if (memories.isNotEmpty()) {
                     append("\n\n[MEMORIAS]:\n")
                     for (m in memories) {
-                        append("- ${m.key}: ${m.value}\n")
+                        val safeKey = UntrustedContentSanitizer.escape(m.key)
+                        val safeVal = UntrustedContentSanitizer.escape(m.value)
+                        append("- $safeKey: <untrusted_content>$safeVal</untrusted_content>\n")
                     }
                 }
                 if (documents.isNotEmpty()) {
                     append("\n\n[DOCUMENTOS]:\n")
                     for (d in documents) {
-                        append("- ${d.title}: <untrusted_content>${d.content.take(1000)}</untrusted_content>\n")
+                        val safeTitle = UntrustedContentSanitizer.escape(d.title)
+                        val safeContent = UntrustedContentSanitizer.escape(d.content.take(1000))
+                        append("- <untrusted_content>=== DOCUMENTO: \"$safeTitle\" ===\n$safeContent</untrusted_content>\n")
                     }
                 }
             }

@@ -28,7 +28,15 @@ object ActionRegistry {
         "CANCEL_AUTOMATION"
     )
 
+    fun canonicalName(action: String): String {
+        val upper = action.trim().uppercase()
+        return when (upper) {
+            "GET_NOTIFICATIONS" -> "READ_NOTIFICATIONS"
+            else -> upper
+        }
+    }
+
     fun isSensitive(action: String): Boolean {
-        return SENSITIVE_ACTIONS.contains(action.uppercase())
+        return SENSITIVE_ACTIONS.contains(canonicalName(action))
     }
 }

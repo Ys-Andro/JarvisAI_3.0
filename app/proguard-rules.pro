@@ -1,21 +1,46 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Project ProGuard Rules for Jarvis AI
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Preserve line numbers and source file attributes for stack traces
+-keepattributes SourceFile,LineNumberTable
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Room Database
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Dao class * { *; }
+-dontwarn androidx.room.paging.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Firebase & Firestore Models
+-keepclassmembers class * {
+    @com.google.firebase.firestore.PropertyName <fields>;
+    @com.google.firebase.firestore.PropertyName <methods>;
+    @com.google.firebase.firestore.DocumentId <fields>;
+    @com.google.firebase.firestore.DocumentId <methods>;
+    @com.google.firebase.firestore.ServerTimestamp <fields>;
+    @com.google.firebase.firestore.ServerTimestamp <methods>;
+}
+-keep class com.example.jarvisai.data.model.todo.** { *; }
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+
+# org.json
+-keep class org.json.** { *; }
+-dontwarn org.json.**
+
+# Manifest components (Services, Receivers, Providers)
+-keep public class * extends android.app.Service
+-keep public class * extends android.content.BroadcastReceiver
+-keep public class * extends android.content.ContentProvider
+-keep class com.example.jarvisai.data.service.** { *; }
+-keep class com.example.jarvisai.data.util.JarvisAccessibilityService { *; }
+-keep class com.example.jarvisai.data.util.JarvisNotificationListenerService { *; }
+-keep class com.example.jarvisai.presentation.widget.JarvisAppWidgetProvider { *; }
+-keep class com.example.jarvisai.data.automation.AutomationApprovalReceiver { *; }
+
+# Jetpack Compose
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
+
+# Kotlin Coroutines
+-keep class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**

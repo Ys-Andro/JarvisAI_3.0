@@ -130,9 +130,10 @@ data class AgentContextSnapshot(
             append("\n[TOOL OBSERVATIONS]\n")
             observations.forEach { obs ->
                 val trimmed = obs.take(1200)
-                val formatted = if (trimmed.contains("<untrusted_content>")) {
-                    trimmed
-                } else if (isExternalContent(trimmed)) {
+                val formatted = if (trimmed.startsWith("<untrusted_content>") && trimmed.endsWith("</untrusted_content>")) {
+                    val inner = trimmed.removePrefix("<untrusted_content>").removeSuffix("</untrusted_content>").trim()
+                    wrapUntrusted(inner)
+                } else if (trimmed.contains("<untrusted_content>") || isExternalContent(trimmed)) {
                     wrapUntrusted(trimmed)
                 } else {
                     trimmed
@@ -150,15 +151,15 @@ data class AgentContextSnapshot(
                 }
                 if (!task.lastObservation.isNullOrBlank()) {
                     val obs = task.lastObservation!!.take(700)
-                    val obsFormatted = if (isExternalContent(obs) && !obs.contains("<untrusted_content>")) {
-                        wrapUntrusted(obs)
+                    val obsFormatted = if (isExternalContent(obs) || obs.contains("<untrusted_content>")) {
+                        wrapUntrusted(obs.removePrefix("<untrusted_content>").removeSuffix("</untrusted_content>").trim())
                     } else obs
                     append(" observation=").append(obsFormatted)
                 }
                 if (!task.output.isNullOrBlank()) {
                     val out = task.output!!.take(700)
-                    val outFormatted = if (isExternalContent(out) && !out.contains("<untrusted_content>")) {
-                        wrapUntrusted(out)
+                    val outFormatted = if (isExternalContent(out) || out.contains("<untrusted_content>")) {
+                        wrapUntrusted(out.removePrefix("<untrusted_content>").removeSuffix("</untrusted_content>").trim())
                     } else out
                     append(" output=").append(outFormatted)
                 }
@@ -171,8 +172,11 @@ data class AgentContextSnapshot(
     }
 
     companion object {
+        fun escapeUntrusted(text: String): String =
+            com.example.jarvisai.data.util.UntrustedContentSanitizer.escape(text)
+
         fun wrapUntrusted(content: String): String =
-            "<untrusted_content>\n$content\n</untrusted_content>"
+            com.example.jarvisai.data.util.UntrustedContentSanitizer.wrap(content)
 
         fun isExternalContent(text: String): Boolean {
             val lower = text.lowercase()

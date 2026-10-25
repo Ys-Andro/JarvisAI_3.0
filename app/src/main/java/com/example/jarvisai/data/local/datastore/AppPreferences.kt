@@ -79,6 +79,20 @@ class AppPreferences(private val context: Context) {
         secret(preferences[Keys.GEMINI_API_KEY])
     }
 
+    val keyDecryptionError: Flow<Boolean> = safePreferences.map { preferences ->
+        val encryptedValues = listOfNotNull(
+            preferences[Keys.GEMINI_API_KEY],
+            preferences[Keys.OPENROUTER_API_KEY],
+            preferences[Keys.OPENAI_API_KEY],
+            preferences[Keys.DEEPSEEK_API_KEY],
+            preferences[Keys.GROQ_API_KEY],
+            preferences[Keys.ANTHROPIC_API_KEY],
+            preferences[Keys.CUSTOM_API_KEY]
+        ).filter { it.startsWith("enc:v1:") }
+
+        encryptedValues.any { secret(it) == null } || SecureSecretStore.decryptionErrorOccurred.value
+    }
+
     fun getProviderApiKey(providerId: String): Flow<String?> = safePreferences.map { preferences ->
         when (providerId.lowercase()) {
             "gemini" -> secret(preferences[Keys.GEMINI_API_KEY])
@@ -194,6 +208,7 @@ class AppPreferences(private val context: Context) {
                 preferences[Keys.GEMINI_API_KEY] = protectedValue(apiKey)
             }
         }
+        SecureSecretStore.clearDecryptionError()
     }
 
     suspend fun updateProviderApiKey(providerId: String, apiKey: String) {
@@ -214,6 +229,7 @@ class AppPreferences(private val context: Context) {
                 preferences[key] = protectedValue(apiKey)
             }
         }
+        SecureSecretStore.clearDecryptionError()
     }
 
     suspend fun updateCustomOpenAiEndpoint(endpoint: String) {

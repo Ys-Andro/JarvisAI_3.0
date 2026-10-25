@@ -25,6 +25,24 @@ class AgentOrchestrator(
     private val contextManager = AgentContextManager(conversationRepository, memoryRepository, documentRepository)
     private val agentCore = AgentCore(taskExecutor, toolRegistry, inferenceRepository, settingsRepository, contextManager)
 
+    suspend fun executePlan(
+        tasks: List<AgentTask>,
+        goal: String = tasks.firstOrNull()?.toolInput.orEmpty(),
+        conversationId: String? = null,
+        imageBase64: String? = null,
+        imageMimeType: String? = null,
+        onTaskUpdate: (List<AgentTask>) -> Unit
+    ): AgentRunResult {
+        return agentCore.run(
+            initialTasks = tasks,
+            goal = goal,
+            conversationId = conversationId,
+            imageBase64 = imageBase64,
+            imageMimeType = imageMimeType,
+            onTaskUpdate = onTaskUpdate
+        )
+    }
+
     suspend fun runPlan(
         tasks: List<AgentTask>,
         goal: String = tasks.firstOrNull()?.toolInput.orEmpty(),
@@ -33,8 +51,8 @@ class AgentOrchestrator(
         imageMimeType: String? = null,
         onTaskUpdate: (List<AgentTask>) -> Unit
     ): String {
-        return when (val result = agentCore.run(
-            initialTasks = tasks,
+        return when (val result = executePlan(
+            tasks = tasks,
             goal = goal,
             conversationId = conversationId,
             imageBase64 = imageBase64,
@@ -43,6 +61,7 @@ class AgentOrchestrator(
         )) {
             is AgentRunResult.Completed -> result.message
             is AgentRunResult.Failed -> "Plan interrumpido: ${result.message}"
+            is AgentRunResult.WaitingConfirmation -> "Plan pausado: la tarea '${result.task.title}' requiere confirmación del usuario."
         }
     }
 

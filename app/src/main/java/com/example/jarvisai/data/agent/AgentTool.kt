@@ -1,5 +1,7 @@
 package com.example.jarvisai.data.agent
 
+import com.example.jarvisai.data.action.ActionRequest
+
 data class AgentToolDescriptor(
     val name: String,
     val description: String,
@@ -11,5 +13,6 @@ data class ToolExecutionResult(
     val success: Boolean,
     val output: String = "",
     val error: String? = null,
-    val requiresConfirmation: Boolean = false
+    val requiresConfirmation: Boolean = false,
+    val actionRequest: ActionRequest? = null
 )

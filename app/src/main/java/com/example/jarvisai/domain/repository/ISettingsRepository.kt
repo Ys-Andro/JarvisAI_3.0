@@ -27,4 +27,5 @@ interface ISettingsRepository {
     suspend fun setHotwordSensitivity(level: String)
     fun getHotwordAutoLaunchApp(): Flow<Boolean>
     suspend fun setHotwordAutoLaunchApp(enable: Boolean)
+    fun hasKeyDecryptionError(): Flow<Boolean> = kotlinx.coroutines.flow.flowOf(false)
 }

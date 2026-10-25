@@ -105,6 +105,15 @@ class ModelsViewModel(
         observeSelectedAgent()
         observeHotwordSettings()
         observeUserProfile()
+        observeKeyDecryptionError()
+    }
+
+    private fun observeKeyDecryptionError() {
+        viewModelScope.launch {
+            settingsRepository.hasKeyDecryptionError().collect { hasError ->
+                _uiState.update { it.copy(keyDecryptionError = hasError) }
+            }
+        }
     }
 
     private fun observeUserProfile() {

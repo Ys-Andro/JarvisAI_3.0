@@ -34,17 +34,17 @@ class ActionValidator(
         params: Map<String, Any>,
         context: Context? = null
     ): Result<ActionRequest> {
-        val upperName = actionName.uppercase().trim()
-        if (upperName.isBlank()) {
+        val canonicalAction = ActionRegistry.canonicalName(actionName)
+        if (canonicalAction.isBlank()) {
             return Result.failure(IllegalArgumentException("El nombre de la acción no puede estar vacío."))
         }
-        if (!ActionRegistry.SUPPORTED_ACTIONS.contains(upperName)) {
-            return Result.failure(IllegalArgumentException("Acción desconocida o no soportada: $upperName"))
+        if (!ActionRegistry.SUPPORTED_ACTIONS.contains(canonicalAction)) {
+            return Result.failure(IllegalArgumentException("Acción desconocida o no soportada: $canonicalAction"))
         }
 
         val effectiveContext = context ?: this.context ?: defaultContext
 
-        when (upperName) {
+        when (canonicalAction) {
             "CALL" -> {
                 val number = (params["number"] ?: params["phone"])?.toString()?.trim().orEmpty()
                 if (number.isBlank()) {
@@ -309,10 +309,10 @@ class ActionValidator(
             }
         }
 
-        val requiresConfirmation = ActionRegistry.isSensitive(upperName)
+        val requiresConfirmation = ActionRegistry.isSensitive(canonicalAction)
         return Result.success(
             ActionRequest(
-                action = upperName,
+                action = canonicalAction,
                 parameters = params,
                 confirmationRequired = requiresConfirmation
             )

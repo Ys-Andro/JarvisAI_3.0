@@ -1,9 +1,10 @@
 package com.example.jarvisai.data.agent
 
+import com.example.jarvisai.data.action.ActionRequest
 import java.util.UUID
 
 enum class TaskStatus {
-    PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, CANCELLED
+    PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, CANCELLED, WAITING_CONFIRMATION
 }
 
 data class AgentTask(
@@ -19,5 +20,6 @@ data class AgentTask(
     val lastObservation: String? = null,
     val retryCount: Int = 0,
     val maxRetries: Int = 2,
-    val replanCount: Int = 0
+    val replanCount: Int = 0,
+    val pendingAction: ActionRequest? = null
 )

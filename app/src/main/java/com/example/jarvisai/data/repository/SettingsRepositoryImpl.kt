@@ -94,4 +94,8 @@ class SettingsRepositoryImpl(
     override suspend fun setHotwordAutoLaunchApp(enable: Boolean) {
         appPreferences.setHotwordAutoLaunchApp(enable)
     }
+
+    override fun hasKeyDecryptionError(): Flow<Boolean> {
+        return appPreferences.keyDecryptionError
+    }
 }

@@ -49,25 +49,56 @@ class AgentCore(
                 onTaskUpdate(tasks.toList())
                 val executed = taskExecutor.executeTask(tasks[index])
                 executionSteps++
-                val observation = executed.lastObservation ?: executed.outputResult ?: executed.error ?: "Sin observación."
-                val formattedObservation = if (AgentContextSnapshot.isExternalContent(observation) && !observation.contains("<untrusted_content>")) {
-                    "<untrusted_content>\n$observation\n</untrusted_content>"
-                } else {
-                    observation
-                }
-                observations += "${executed.title}: $formattedObservation"
                 tasks[index] = executed
                 onTaskUpdate(tasks.toList())
 
                 when (executed.status) {
-                    TaskStatus.COMPLETED -> { index++; continue }
+                    TaskStatus.COMPLETED -> {
+                        val observation = executed.lastObservation ?: executed.outputResult ?: "Completado."
+                        val formattedObservation = if (AgentContextSnapshot.isExternalContent(observation)) {
+                            if (observation.startsWith("<untrusted_content>") && observation.endsWith("</untrusted_content>")) {
+                                val inner = observation.removePrefix("<untrusted_content>").removeSuffix("</untrusted_content>").trim()
+                                com.example.jarvisai.data.util.UntrustedContentSanitizer.wrap(inner)
+                            } else {
+                                com.example.jarvisai.data.util.UntrustedContentSanitizer.wrap(observation)
+                            }
+                        } else {
+                            observation
+                        }
+                        observations += "${executed.title}: $formattedObservation"
+                        index++
+                        continue
+                    }
+                    TaskStatus.WAITING_CONFIRMATION -> {
+                        // Pausar el plan inmediatamente. No reintentar ni replanificar.
+                        return AgentRunResult.WaitingConfirmation(
+                            task = executed,
+                            pendingAction = executed.pendingAction,
+                            tasks = tasks.toList(),
+                            observations = observations.toList()
+                        )
+                    }
                     TaskStatus.PENDING -> { continue }
                     TaskStatus.CANCELLED -> {
                         markRemainingAsSkipped(tasks, index + 1)
                         onTaskUpdate(tasks.toList())
                         return AgentRunResult.Failed("La ejecución fue cancelada.", observations.toList())
                     }
-                    TaskStatus.FAILED -> { /* handled by replan below */ }
+                    TaskStatus.FAILED -> {
+                        val observation = executed.lastObservation ?: executed.error ?: "Fallo."
+                        val formattedObservation = if (AgentContextSnapshot.isExternalContent(observation)) {
+                            if (observation.startsWith("<untrusted_content>") && observation.endsWith("</untrusted_content>")) {
+                                val inner = observation.removePrefix("<untrusted_content>").removeSuffix("</untrusted_content>").trim()
+                                com.example.jarvisai.data.util.UntrustedContentSanitizer.wrap(inner)
+                            } else {
+                                com.example.jarvisai.data.util.UntrustedContentSanitizer.wrap(observation)
+                            }
+                        } else {
+                            observation
+                        }
+                        observations += "${executed.title}: $formattedObservation"
+                        /* handled by replan below */
+                    }
                     else -> { index++; continue }
                 }
             }
@@ -126,11 +157,19 @@ class AgentCore(
         imageMimeType: String? = null
     ): List<AgentTask>? {
         val settings = settingsRepository.getSettings().first()
+        val sanitizedObservations = observations.filterNot {
+            it.contains("confirmación", ignoreCase = true) || it.contains("confirmation", ignoreCase = true)
+        }
+        val sanitizedError = if (failedTask.error?.contains("confirmación", ignoreCase = true) == true || failedTask.error?.contains("confirmation", ignoreCase = true) == true) {
+            "Fallo de ejecución de herramienta."
+        } else {
+            failedTask.error.orEmpty()
+        }
         val context = contextManager.build(
             goal = goal,
             conversationId = conversationId,
             tasks = tasks,
-            observations = observations
+            observations = sanitizedObservations
         )
         val prompt = """
             [AGENT REPLANNING]
@@ -148,7 +187,7 @@ class AgentCore(
             Failed task: ${failedTask.title}
             Tool: ${failedTask.toolName}
             Input: ${failedTask.toolInput}
-            Error: ${failedTask.error.orEmpty()}
+            Error: $sanitizedError
             Replan attempt: ${replanNumber} of ${maxReplans}.
 
             Available tools:
@@ -201,4 +240,10 @@ class AgentCore(
 sealed class AgentRunResult {
     data class Completed(val message: String, val observations: List<String>) : AgentRunResult()
     data class Failed(val message: String, val observations: List<String>) : AgentRunResult()
+    data class WaitingConfirmation(
+        val task: AgentTask,
+        val pendingAction: com.example.jarvisai.data.action.ActionRequest?,
+        val tasks: List<AgentTask>,
+        val observations: List<String>
+    ) : AgentRunResult()
 }

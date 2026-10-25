@@ -3,6 +3,8 @@ name: Build Jarvis AI (Android)
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -12,12 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build APKs
+  test-and-build-debug:
+    name: Test and Build Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
       actions: read
     steps:
       - uses: actions/checkout@v4
@@ -33,12 +35,26 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
+      - name: Setup google-services.json
+        run: |
+          set -e
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" ]; then
+            echo "Decoding google-services.json from secret"
+            echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > app/google-services.json
+          elif [ ! -f app/google-services.json ]; then
+            echo "Warning: app/google-services.json not found and secret not configured."
+          fi
+
       - name: Prepare stable development signing key
         run: |
           set -e
-          if [ -f debug.keystore ]; then
+          if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
+            echo "Decoding stable debug keystore from DEBUG_KEYSTORE_BASE64 secret"
+            echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
+          elif [ -f debug.keystore ]; then
             echo "Using repository-provided debug.keystore"
           else
+            echo "Generating fallback debug keystore"
             keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
@@ -72,10 +88,6 @@ jobs:
           cp "$APK" dist/app-debug.apk
           tar -cf dist/jarvis-debug.tar -C dist app-debug.apk
           tar -tf dist/jarvis-debug.tar
-          mkdir -p /tmp/apkcheck
-          tar -xf dist/jarvis-debug.tar -C /tmp/apkcheck
-          unzip -t /tmp/apkcheck/app-debug.apk
-          echo "APK listo para instalar"
 
       - name: Upload Debug APK tar (Backup artifact)
         uses: actions/upload-artifact@v4
@@ -86,34 +98,114 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      - name: Upload APK to GitHub Release
+  publish-prerelease:
+    name: Publish GitHub Pre-Release
+    needs: test-and-build-debug
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Debug APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: jarvis-ai-debug
+          path: dist
+
+      - name: Extract APK
+        run: |
+          tar -xf dist/jarvis-debug.tar -C dist
+          ls -la dist
+
+      - name: Upload APK to GitHub Pre-Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: debug-${{ github.run_number }}
           name: JarvisAI Debug Build #${{ github.run_number }}
           draft: false
           prerelease: true
-          files: app/build/outputs/apk/debug/*.apk
+          files: dist/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  publish-release:
+    name: Build and Publish Signed Release
+    needs: test-and-build-debug
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Setup google-services.json
+        run: |
+          set -e
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" ]; then
+            echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > app/google-services.json
+          fi
+
+      - name: Prepare release keystore from secrets
+        run: |
+          set -e
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "Decoding release keystore"
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+          else
+            echo "Warning: RELEASE_KEYSTORE_BASE64 secret not found"
+          fi
+
+      - name: Set release app version
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "JARVIS_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "JARVIS_VERSION_NAME=${TAG_VERSION}" >> "$GITHUB_ENV"
+
       - name: Build Release APK
         run: gradle :app:assembleRelease --stacktrace --no-daemon
+        env:
+          CI: "true"
+          KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       - name: Pack Release APK
         run: |
-          if ls app/build/outputs/apk/release/*.apk 1>/dev/null 2>&1; then
-            mkdir -p dist-release
-            APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
-            cp "$APK" dist-release/app-release.apk
-            tar -cf dist-release/jarvis-release.tar -C dist-release app-release.apk
-          fi
+          set -e
+          mkdir -p dist-release
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          cp "$APK" dist-release/app-release.apk
+          tar -cf dist-release/jarvis-release.tar -C dist-release app-release.apk
 
-      - name: Upload Release APK tar
+      - name: Upload Release APK tar (Artifact)
         uses: actions/upload-artifact@v4
         with:
           name: jarvis-ai-release
           path: dist-release/jarvis-release.tar
           compression-level: 0
-          retention-days: 14
-          if-no-files-found: ignore
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Create Signed GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: JarvisAI Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: dist-release/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -83,6 +83,24 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    function getTodoListData(lId) {
+      return get(/databases/$(database)/documents/todo_lists/$(lId)).data;
+    }
+
+    function isTodoListMember(lId) {
+      return isSignedIn() && (request.auth.uid in getTodoListData(lId).memberUids);
+    }
+
+    function canUpdateTodoListMemberUids() {
+      let isOwner = request.auth.uid == existing().ownerId;
+      let memberUidsChanged = 'memberUids' in incoming().diff(existing()).affectedKeys();
+      let isSelfRemoval = request.auth.uid in existing().memberUids &&
+                          !(request.auth.uid in incoming().memberUids) &&
+                          incoming().memberUids.size() == existing().memberUids.size() - 1 &&
+                          existing().memberUids.hasAll(incoming().memberUids);
+      return !memberUidsChanged || isOwner || isSelfRemoval;
+    }
+
     // /todo_lists/{listId}
     match /todo_lists/{listId} {
       allow get: if isSignedIn() && isValidId(listId) && (request.auth.uid in existing().memberUids);
@@ -98,6 +116,7 @@ service cloud.firestore {
                        incoming().ownerId == existing().ownerId &&
                        incoming().createdAt == existing().createdAt &&
                        isValidTodoList(incoming()) &&
+                       canUpdateTodoListMemberUids() &&
                        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'memberUids', 'colorHex', 'totalTasks', 'completedTasks', 'updatedAt']);
 
       allow delete: if isSignedIn() && isValidId(listId) &&
@@ -105,25 +124,24 @@ service cloud.firestore {
 
       // /todo_lists/{listId}/tasks/{taskId}
       match /tasks/{taskId} {
-        allow get: if isSignedIn() && isValidId(taskId) && (request.auth.uid in existing().memberUids);
-        allow list: if isSignedIn() && (request.auth.uid in resource.data.memberUids);
+        allow get: if isTodoListMember(listId) && isValidId(taskId);
+        allow list: if isTodoListMember(listId);
 
-        allow create: if isSignedIn() && isValidId(taskId) &&
+        allow create: if isTodoListMember(listId) && isValidId(taskId) &&
                          incoming().listId == listId &&
                          incoming().createdByUid == request.auth.uid &&
-                         (request.auth.uid in incoming().memberUids) &&
+                         incoming().memberUids == getTodoListData(listId).memberUids &&
                          isValidTodoTask(incoming());
 
-        allow update: if isSignedIn() && isValidId(taskId) &&
-                         (request.auth.uid in existing().memberUids) &&
+        allow update: if isTodoListMember(listId) && isValidId(taskId) &&
                          incoming().listId == existing().listId &&
                          incoming().createdByUid == existing().createdByUid &&
                          incoming().createdAt == existing().createdAt &&
+                         incoming().memberUids == getTodoListData(listId).memberUids &&
                          isValidTodoTask(incoming()) &&
                          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'completed', 'priority', 'dueDate', 'assignedToUid', 'assignedToName', 'memberUids', 'updatedAt']);
 
-        allow delete: if isSignedIn() && isValidId(taskId) &&
-                         (request.auth.uid in existing().memberUids);
+        allow delete: if isTodoListMember(listId) && isValidId(taskId);
       }
     }
   }
