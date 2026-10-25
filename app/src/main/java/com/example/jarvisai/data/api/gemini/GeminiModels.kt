@@ -17,7 +17,9 @@ data class GeminiGenerationConfig(
     val temperature: Float = 0.7f,
     val topP: Float = 0.95f,
     val topK: Int = 40,
-    val maxOutputTokens: Int = 2048
+    val maxOutputTokens: Int = 2048,
+    val thinkingLevel: String? = null,
+    val thinkingBudget: Int? = null
 )
 
 object GeminiJsonMapper {
@@ -27,7 +29,8 @@ object GeminiJsonMapper {
         history: List<GeminiMessage>,
         systemPrompt: String?,
         config: GeminiGenerationConfig,
-        inlineData: GeminiInlineData? = null
+        inlineData: GeminiInlineData? = null,
+        modelName: String? = null
     ): String {
         val root = JSONObject()
 
@@ -74,6 +77,30 @@ object GeminiJsonMapper {
             .put("topP", config.topP)
             .put("topK", config.topK)
             .put("maxOutputTokens", config.maxOutputTokens)
+
+        val isGemini3 = modelName?.startsWith("gemini-3") == true
+        val isGemini25Flash = modelName?.contains("gemini-2.5-flash") == true
+
+        if (config.thinkingLevel != null && config.thinkingBudget == null) {
+            val thinkingConfig = JSONObject().put("thinkingLevel", config.thinkingLevel)
+            genConfig.put("thinkingConfig", thinkingConfig)
+        } else if (config.thinkingBudget != null && config.thinkingLevel == null) {
+            val thinkingConfig = JSONObject().put("thinkingBudget", config.thinkingBudget)
+            genConfig.put("thinkingConfig", thinkingConfig)
+        } else if (config.thinkingLevel != null && config.thinkingBudget != null) {
+            // Never send both simultaneously: prioritize thinkingLevel if gemini-3, else thinkingBudget
+            val thinkingConfig = JSONObject()
+            if (isGemini3) {
+                thinkingConfig.put("thinkingLevel", config.thinkingLevel)
+            } else {
+                thinkingConfig.put("thinkingBudget", config.thinkingBudget)
+            }
+            genConfig.put("thinkingConfig", thinkingConfig)
+        } else if (isGemini25Flash) {
+            val thinkingConfig = JSONObject().put("thinkingBudget", 0)
+            genConfig.put("thinkingConfig", thinkingConfig)
+        }
+
         root.put("generationConfig", genConfig)
 
         return root.toString()

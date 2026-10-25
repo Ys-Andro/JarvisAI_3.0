@@ -35,15 +35,13 @@ class GoogleCloudTtsRepository(
 
     private var mediaPlayer: MediaPlayer? = null
 
-    override suspend fun speak(text: String, pitch: Float, speed: Float) = withContext(Dispatchers.IO) {
+    override suspend fun speak(text: String, pitch: Float, speed: Float, queueMode: Int) = withContext(Dispatchers.IO) {
         val apiKey = settingsRepository.getApiKey().first()?.takeIf { it.isNotBlank() }
             ?: settingsRepository.getProviderApiKey("gemini").first()?.takeIf { it.isNotBlank() } ?: ""
 
-        if (apiKey.isBlank()) {
-            if (BuildConfig.DEBUG) {
-                Log.w(TAG, "Google Cloud TTS API key not found in settings. Falling back to Android TTS.")
-            }
-            fallbackTts.speak(text, pitch, speed)
+        // Prioritize local Android TTS for short responses (< 200 chars) to eliminate network latency
+        if (text.length < 200 || apiKey.isBlank()) {
+            fallbackTts.speak(text, pitch, speed, queueMode)
             return@withContext
         }
 

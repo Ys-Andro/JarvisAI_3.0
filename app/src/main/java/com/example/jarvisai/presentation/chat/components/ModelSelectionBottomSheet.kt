@@ -86,6 +86,8 @@ import com.example.jarvisai.ui.theme.JarvisSurfaceElevated
 import com.example.jarvisai.ui.theme.JarvisTextPrimary
 import com.example.jarvisai.ui.theme.JarvisTextSecondary
 
+const val SHOW_ADVANCED_PROVIDERS = false
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelSelectionBottomSheet(
@@ -103,10 +105,21 @@ fun ModelSelectionBottomSheet(
     var searchQuery by remember { mutableStateOf("") }
     var selectedProviderFilter by remember { mutableStateOf<ModelProvider?>(null) }
 
-    val allModels = remember { CloudAiModel.ALL_MODELS }
+    val allModels = remember {
+        if (SHOW_ADVANCED_PROVIDERS) {
+            CloudAiModel.ALL_MODELS
+        } else {
+            CloudAiModel.ALL_MODELS.filter {
+                it.provider != ModelProvider.DEEPSEEK &&
+                it.provider != ModelProvider.OPENROUTER &&
+                it.provider != ModelProvider.OPENAI &&
+                it.provider != ModelProvider.ANTHROPIC
+            }
+        }
+    }
     val currentModel = remember(selectedModelId) { CloudAiModel.findById(selectedModelId) }
 
-    val filteredModels = remember(searchQuery, selectedProviderFilter) {
+    val filteredModels = remember(searchQuery, selectedProviderFilter, allModels) {
         allModels.filter { model ->
             val matchesProvider = selectedProviderFilter == null || model.provider == selectedProviderFilter
             val matchesSearch = searchQuery.isBlank() ||
@@ -433,41 +446,43 @@ private fun ProviderFilterChipsRow(
             onClick = { onSelectProvider(ModelProvider.GROQ) }
         )
 
-        // OpenAI Chip
-        ProviderChip(
-            label = "🌐 OPENAI",
-            icon = Icons.Default.Code,
-            isSelected = selectedProvider == ModelProvider.OPENAI,
-            brandColor = Color(0xFF10A37F),
-            onClick = { onSelectProvider(ModelProvider.OPENAI) }
-        )
+        if (SHOW_ADVANCED_PROVIDERS) {
+            // OpenAI Chip
+            ProviderChip(
+                label = "🌐 OPENAI",
+                icon = Icons.Default.Code,
+                isSelected = selectedProvider == ModelProvider.OPENAI,
+                brandColor = Color(0xFF10A37F),
+                onClick = { onSelectProvider(ModelProvider.OPENAI) }
+            )
 
-        // DeepSeek Chip
-        ProviderChip(
-            label = "🔮 DEEPSEEK",
-            icon = Icons.Default.BubbleChart,
-            isSelected = selectedProvider == ModelProvider.DEEPSEEK,
-            brandColor = Color(0xFF0070F3),
-            onClick = { onSelectProvider(ModelProvider.DEEPSEEK) }
-        )
+            // DeepSeek Chip
+            ProviderChip(
+                label = "🔮 DEEPSEEK",
+                icon = Icons.Default.BubbleChart,
+                isSelected = selectedProvider == ModelProvider.DEEPSEEK,
+                brandColor = Color(0xFF0070F3),
+                onClick = { onSelectProvider(ModelProvider.DEEPSEEK) }
+            )
 
-        // Anthropic Chip
-        ProviderChip(
-            label = "🎭 CLAUDE",
-            icon = Icons.Default.AutoAwesome,
-            isSelected = selectedProvider == ModelProvider.ANTHROPIC,
-            brandColor = Color(0xFFD97706),
-            onClick = { onSelectProvider(ModelProvider.ANTHROPIC) }
-        )
+            // Anthropic Chip
+            ProviderChip(
+                label = "🎭 CLAUDE",
+                icon = Icons.Default.AutoAwesome,
+                isSelected = selectedProvider == ModelProvider.ANTHROPIC,
+                brandColor = Color(0xFFD97706),
+                onClick = { onSelectProvider(ModelProvider.ANTHROPIC) }
+            )
 
-        // OpenRouter Chip
-        ProviderChip(
-            label = "🔀 OPENROUTER",
-            icon = Icons.Default.Settings,
-            isSelected = selectedProvider == ModelProvider.OPENROUTER,
-            brandColor = Color(0xFF8B5CF6),
-            onClick = { onSelectProvider(ModelProvider.OPENROUTER) }
-        )
+            // OpenRouter Chip
+            ProviderChip(
+                label = "🔀 OPENROUTER",
+                icon = Icons.Default.Settings,
+                isSelected = selectedProvider == ModelProvider.OPENROUTER,
+                brandColor = Color(0xFF8B5CF6),
+                onClick = { onSelectProvider(ModelProvider.OPENROUTER) }
+            )
+        }
     }
 }
 

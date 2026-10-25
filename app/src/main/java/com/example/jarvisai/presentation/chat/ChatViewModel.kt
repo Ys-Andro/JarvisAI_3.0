@@ -625,25 +625,24 @@ class ChatViewModel(
     }
 
     private fun shouldUseAgent(prompt: String): Boolean {
-        val normalized = prompt.trim().lowercase()
-        if (normalized.length < 3) return false
-        val actionSignals = listOf(
-            "abre ", "abrir ", "cierra ", "cerrar ", "pon ", "poner ", "activa ", "activar ",
-            "desactiva ", "enciende ", "apaga ", "llama ", "llamar ", "manda ", "enviar ",
-            "envía ", "navega ", "buscar ", "busca ", "reproduce ", "reproducir ",
-            "crea una alarma", "pon una alarma", "temporizador", "toma una captura",
-            "lee la pantalla", "guarda en memoria", "recuerda ", "recuérdame", "programa ",
-            "programar ", "cada día", "cada semana", "en 10 minutos", "en una hora", "ejecuta "
+        val norm = com.example.jarvisai.data.action.SemanticIntentInterpreter.normalize(prompt)
+        if (norm.length < 5) return false
+
+        // Complex multi-step planning signals
+        val complexSignals = listOf(
+            "planifica", "crea un plan", "organiza paso a paso", "secuencia", "varias acciones",
+            "primero haz", "luego haz", "y despues", "y luego", "despues de eso",
+            "investiga y luego", "compara y luego", "automatiza varios pasos",
+            "paso 1", "paso a paso", "repite la accion y luego"
         )
-        val hasDirectAction = actionSignals.any { normalized.startsWith(it) || normalized.contains(" $it") }
+        val hasComplexPlanning = complexSignals.any { norm.contains(it) }
 
         val multiStepFollowUps = listOf(
-            "ahora haz lo mismo", "haz lo mismo", "haz lo anterior", "haz aquello",
-            "repite la acción", "repite lo mismo", "ejecuta lo anterior"
+            "ahora haz lo mismo y ademas", "haz lo anterior y luego", "ejecuta ambos pasos"
         )
-        val hasFollowUp = multiStepFollowUps.any { normalized.contains(it) }
+        val hasFollowUp = multiStepFollowUps.any { norm.contains(it) }
 
-        return hasDirectAction || hasFollowUp
+        return hasComplexPlanning || hasFollowUp
     }
 
     private fun executeAgentGoal(
@@ -677,6 +676,7 @@ class ChatViewModel(
             }
         }
     }
+
     private fun executeInferenceStream(
         assistantMsgId: String,
         prompt: String,
@@ -690,59 +690,108 @@ class ChatViewModel(
             val responseBuilder = StringBuilder()
             val startTime = System.currentTimeMillis()
             var tokenCount = 0
+            var lastPersistTime = 0L
+            val spokenSentences = mutableSetOf<String>()
+            var sentenceBuffer = StringBuilder()
 
-            inferenceRepository.generateCompletionStream(
-                prompt = prompt,
-                conversationHistory = history,
-                settings = settings,
-                imageBase64 = imageBase64,
-                imageMimeType = imageMimeType
-            )
-                .catch { error ->
-                    _uiState.update {
-                        it.copy(
-                            errorMessage = error.message,
-                            streamingMessageId = null
-                        )
-                    }
-                }
-                .collect { tokenPiece ->
-                    tokenCount++
-                    responseBuilder.append(tokenPiece)
-                    val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(1L)
-                    val tokPerSec = (tokenCount.toFloat() / (elapsedMs.toFloat() / 1000f))
-
-                    conversationRepository.updateMessageContent(
-                        messageId = assistantMsgId,
-                        content = responseBuilder.toString(),
-                        tokensPerSec = tokPerSec,
-                        durationMs = elapsedMs
-                    )
-                }
-
-            val finalElapsedMs = System.currentTimeMillis() - startTime
-            val finalTokPerSec = if (finalElapsedMs > 0) tokenCount.toFloat() / (finalElapsedMs.toFloat() / 1000f) else 0f
-
-            _uiState.update {
-                it.copy(
-                    streamingMessageId = null,
-                    tokensPerSecond = finalTokPerSec
+            try {
+                inferenceRepository.generateCompletionStream(
+                    prompt = prompt,
+                    conversationHistory = history,
+                    settings = settings,
+                    imageBase64 = imageBase64,
+                    imageMimeType = imageMimeType
                 )
-            }
+                    .catch { error ->
+                        _uiState.update {
+                            it.copy(
+                                errorMessage = error.message,
+                                streamingMessageId = null
+                            )
+                        }
+                    }
+                    .collect { tokenPiece ->
+                        tokenCount++
+                        responseBuilder.append(tokenPiece)
+                        sentenceBuffer.append(tokenPiece)
 
-            val rawFinalResponse = responseBuilder.toString()
-            val finalResponse = sanitizeAssistantResponse(rawFinalResponse)
-            if (finalResponse != rawFinalResponse) {
+                        val elapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(1L)
+                        val tokPerSec = (tokenCount.toFloat() / (elapsedMs.toFloat() / 1000f))
+                        val currentText = responseBuilder.toString()
+
+                        // 1. Immediate UI update in memory
+                        _uiState.update { state ->
+                            val updated = state.messages.map { msg ->
+                                if (msg.id == assistantMsgId) msg.copy(content = currentText, tokensPerSecond = tokPerSec) else msg
+                            }
+                            state.copy(messages = updated, tokensPerSecond = tokPerSec)
+                        }
+
+                        // 2. Persist to Room at most every 150 ms to avoid token-by-token DB writes
+                        val now = System.currentTimeMillis()
+                        if (now - lastPersistTime >= 150) {
+                            lastPersistTime = now
+                            conversationRepository.updateMessageContent(
+                                messageId = assistantMsgId,
+                                content = currentText,
+                                tokensPerSec = tokPerSec,
+                                durationMs = elapsedMs
+                            )
+                        }
+
+                        // 3. Sentence-by-sentence TTS streaming
+                        if (settings.autoTts) {
+                            val bufferText = sentenceBuffer.toString()
+                            val sentenceMatch = Regex("([^.!?\\n]+[.!?\\n])").findAll(bufferText).toList()
+                            for (m in sentenceMatch) {
+                                val s = m.value.trim()
+                                if (s.length > 3 && !spokenSentences.contains(s) && !s.startsWith("[JARVIS_ACTION")) {
+                                    spokenSentences.add(s)
+                                    val cleanSentence = sanitizeAssistantResponse(s)
+                                    if (cleanSentence.isNotBlank()) {
+                                        ttsRepository.speak(
+                                            text = cleanSentence,
+                                            pitch = settings.ttsPitch,
+                                            speed = settings.ttsSpeed,
+                                            queueMode = 1
+                                        )
+                                    }
+                                }
+                            }
+                            val lastIdx = bufferText.lastIndexOfAny(charArrayOf('.', '!', '?', '\n'))
+                            if (lastIdx != -1 && lastIdx < bufferText.length - 1) {
+                                sentenceBuffer = StringBuilder(bufferText.substring(lastIdx + 1))
+                            } else if (lastIdx != -1) {
+                                sentenceBuffer.clear()
+                            }
+                        }
+                    }
+            } finally {
+                val finalElapsedMs = (System.currentTimeMillis() - startTime).coerceAtLeast(1L)
+                val finalTokPerSec = if (finalElapsedMs > 0) tokenCount.toFloat() / (finalElapsedMs.toFloat() / 1000f) else 0f
+                val rawFinalResponse = responseBuilder.toString()
+                val finalResponse = sanitizeAssistantResponse(rawFinalResponse)
+
+                // Always persist final state to Room on completion/cancellation
                 conversationRepository.updateMessageContent(
                     messageId = assistantMsgId,
-                    content = finalResponse,
+                    content = if (finalResponse.isNotBlank()) finalResponse else rawFinalResponse,
                     tokensPerSec = finalTokPerSec,
                     durationMs = finalElapsedMs
                 )
-            }
-            checkAndTriggerPendingAction(finalResponse)
-            if (settings.autoTts && finalResponse.isNotBlank()) {
-                speakText(finalResponse)
+
+                _uiState.update {
+                    it.copy(
+                        streamingMessageId = null,
+                        tokensPerSecond = finalTokPerSec
+                    )
+                }
+
+                checkAndTriggerPendingAction(finalResponse)
+
+                if (settings.autoTts && spokenSentences.isEmpty() && finalResponse.isNotBlank()) {
+                    speakText(finalResponse)
+                }
             }
         }
     }

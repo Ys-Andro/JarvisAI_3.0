@@ -39,64 +39,87 @@ class GeminiApiClient(
         config: GeminiGenerationConfig,
         inlineData: GeminiInlineData? = null
     ): Flow<String> = flow {
-        val endpoint = "$baseUrl/$modelName:streamGenerateContent?alt=sse"
-        val requestJson = GeminiJsonMapper.buildRequestBody(prompt, history, systemPrompt, config, inlineData)
+        var currentConfig = config
+        var retried = false
 
-        var connection: HttpURLConnection? = null
-        var reader: BufferedReader? = null
+        while (true) {
+            val endpoint = "$baseUrl/$modelName:streamGenerateContent?alt=sse"
+            val requestJson = GeminiJsonMapper.buildRequestBody(prompt, history, systemPrompt, currentConfig, inlineData, modelName)
 
-        try {
-            val url = URL(endpoint)
-            connection = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doOutput = true
-                doInput = true
-                connectTimeout = 15000
-                readTimeout = 30000
-                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                setRequestProperty("Accept", "text/event-stream")
-                if (apiKey.isNotBlank()) {
-                    setRequestProperty("x-goog-api-key", apiKey)
+            var connection: HttpURLConnection? = null
+            var reader: BufferedReader? = null
+
+            try {
+                val url = URL(endpoint)
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    doOutput = true
+                    doInput = true
+                    connectTimeout = 8000
+                    readTimeout = 30000
+                    setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    setRequestProperty("Accept", "text/event-stream")
+                    if (apiKey.isNotBlank()) {
+                        setRequestProperty("x-goog-api-key", apiKey)
+                    }
                 }
-            }
 
-            OutputStreamWriter(connection.outputStream, "UTF-8").use { writer ->
-                writer.write(requestJson)
-                writer.flush()
-            }
-
-            val responseCode = connection.responseCode
-            if (responseCode !in 200..299) {
-                val errorStream = connection.errorStream
-                val errorBody = errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $responseCode"
-                val detailedError = parseErrorMessage(errorBody, responseCode)
-                if (BuildConfig.DEBUG) {
-                    Log.e(TAG, "Gemini API error ($responseCode): $detailedError")
+                OutputStreamWriter(connection.outputStream, "UTF-8").use { writer ->
+                    writer.write(requestJson)
+                    writer.flush()
                 }
-                throw IllegalStateException(detailedError)
-            }
 
-            reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))
-            var line: String?
+                val responseCode = connection.responseCode
+                if (responseCode !in 200..299) {
+                    val errorStream = connection.errorStream
+                    val errorBody = errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $responseCode"
+                    val isThinkingError = responseCode == 400 && (
+                        errorBody.contains("thinking", ignoreCase = true) ||
+                        errorBody.contains("thinkingConfig", ignoreCase = true) ||
+                        errorBody.contains("thinkingLevel", ignoreCase = true) ||
+                        errorBody.contains("thinkingBudget", ignoreCase = true)
+                    )
 
-            while (currentCoroutineContext().isActive) {
-                line = reader.readLine() ?: break
-                val trimmed = line.trim()
-                if (trimmed.startsWith("data:")) {
-                    val jsonPayload = trimmed.removePrefix("data:").trim()
-                    if (jsonPayload.isNotEmpty() && jsonPayload != "[DONE]") {
-                        val token = GeminiJsonMapper.parseStreamChunk(jsonPayload)
-                        if (token.isNotEmpty()) {
-                            emit(token)
+                    if (!retried && isThinkingError && currentConfig.thinkingLevel != "low") {
+                        retried = true
+                        currentConfig = currentConfig.copy(thinkingLevel = "low", thinkingBudget = null)
+                        if (BuildConfig.DEBUG) {
+                            Log.w(TAG, "Retrying Gemini request with thinkingLevel='low' after rejection: $errorBody")
+                        }
+                        connection.disconnect()
+                        continue
+                    }
+
+                    val detailedError = parseErrorMessage(errorBody, responseCode)
+                    if (BuildConfig.DEBUG) {
+                        Log.e(TAG, "Gemini API error ($responseCode): $detailedError")
+                    }
+                    throw IllegalStateException(detailedError)
+                }
+
+                reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))
+                var line: String?
+
+                while (currentCoroutineContext().isActive) {
+                    line = reader.readLine() ?: break
+                    val trimmed = line.trim()
+                    if (trimmed.startsWith("data:")) {
+                        val jsonPayload = trimmed.removePrefix("data:").trim()
+                        if (jsonPayload.isNotEmpty() && jsonPayload != "[DONE]") {
+                            val token = GeminiJsonMapper.parseStreamChunk(jsonPayload)
+                            if (token.isNotEmpty()) {
+                                emit(token)
+                            }
                         }
                     }
                 }
+                break
+            } finally {
+                try {
+                    reader?.close()
+                } catch (_: Exception) {}
+                connection?.disconnect()
             }
-        } finally {
-            try {
-                reader?.close()
-            } catch (_: Exception) {}
-            connection?.disconnect()
         }
     }.flowOn(Dispatchers.IO)
 

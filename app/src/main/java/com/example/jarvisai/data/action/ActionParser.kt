@@ -82,75 +82,7 @@ class ActionParser {
      * Nota: Esto es una heurística de filtrado y no una barrera de seguridad infalible.
      */
     fun isActionRelevantToPrompt(actionName: String, jsonPayload: String, userPrompt: String?): Boolean {
-        val isSensitive = ActionRegistry.isSensitive(actionName)
-        if (userPrompt.isNullOrBlank()) {
-            // Fail closed for sensitive actions if userPrompt is missing, keep current behavior for non-sensitive actions
-            return !isSensitive
-        }
-
-        // Normalize prompt: lowercase and strip diacritics/accents
-        val normalizedPrompt = java.text.Normalizer.normalize(userPrompt, java.text.Normalizer.Form.NFD)
-            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
-            .lowercase()
-
-        return when (actionName) {
-            "OPEN_APP" -> {
-                val appName = try { JSONObject(jsonPayload).optString("appName", "") } catch (_: Exception) { "" }.lowercase()
-                val pkgName = try { JSONObject(jsonPayload).optString("packageName", "") } catch (_: Exception) { "" }.lowercase()
-                val hasOpenVerb = listOf("abre", "abrir", "inicia", "iniciar", "lanza", "lanzar", "ejecuta", "ejecutar", "entra", "entrar", "open", "launch").any { normalizedPrompt.contains(it) }
-                val mentionsApp = (appName.isNotBlank() && normalizedPrompt.contains(appName)) || (pkgName.isNotBlank() && normalizedPrompt.contains(pkgName))
-                hasOpenVerb || mentionsApp
-            }
-            "CALL" -> {
-                listOf("llama", "llamar", "llamada", "marca", "marcar", "telefono", "telefono", "call").any { normalizedPrompt.contains(it) }
-            }
-            "WHATSAPP_MESSAGE" -> {
-                listOf("whatsapp", "watsap", "wasap", "whats", "mensaje").any { normalizedPrompt.contains(it) }
-            }
-            "FLASHLIGHT" -> {
-                listOf("linterna", "flash", "luz", "ilumina", "enciende", "apaga").any { normalizedPrompt.contains(it) }
-            }
-            "VOLUME", "MUTE" -> {
-                listOf("volumen", "sonido", "mute", "silencio", "silencia", "sube", "baja", "audio").any { normalizedPrompt.contains(it) }
-            }
-            "SET_ALARM" -> {
-                listOf("alarma", "despiertame", "despertar", "alarm").any { normalizedPrompt.contains(it) }
-            }
-            "SET_TIMER" -> {
-                listOf("temporizador", "timer", "cronometro", "cuenta regresiva").any { normalizedPrompt.contains(it) }
-            }
-            "LOCK_SCREEN" -> {
-                listOf("bloquea", "bloquear", "apaga pantalla", "lock").any { normalizedPrompt.contains(it) }
-            }
-            "SCREENSHOT" -> {
-                listOf("captura", "pantallazo", "screenshot").any { normalizedPrompt.contains(it) }
-            }
-            "READ_SCREEN" -> {
-                listOf("lee la pantalla", "que hay en la pantalla", "lee pantalla").any { normalizedPrompt.contains(it) }
-            }
-            "OPEN_URL" -> {
-                listOf("abre url", "enlace", "link", "sitio", "web", "pagina", "navega", "open url").any { normalizedPrompt.contains(it) }
-            }
-            "SAVE_MEMORY" -> {
-                listOf("guarda", "recuerda", "memoria", "anota", "memoriza", "save", "remember").any { normalizedPrompt.contains(it) }
-            }
-            "DELETE_MEMORY" -> {
-                listOf("borra", "elimina", "olvida", "memoria", "delete", "forget").any { normalizedPrompt.contains(it) }
-            }
-            "TYPE_TEXT" -> {
-                listOf("escribe", "teclea", "type", "text", "redacta").any { normalizedPrompt.contains(it) }
-            }
-            "CLICK_TEXT" -> {
-                listOf("haz click", "presiona", "toca", "pulsar", "click", "tap").any { normalizedPrompt.contains(it) }
-            }
-            "READ_NOTIFICATIONS" -> {
-                listOf("notificaciones", "mensajes nuevos", "avisos", "notifications", "lee").any { normalizedPrompt.contains(it) }
-            }
-            "SCHEDULE_ACTION" -> {
-                listOf("programa", "automatiza", "automatizacion", "recuerdame", "schedule", "automate").any { normalizedPrompt.contains(it) }
-            }
-            else -> true
-        }
+        return SemanticIntentInterpreter.isActionSemanticallyRelevant(actionName, jsonPayload, userPrompt)
     }
 
     // Overload for backward compatibility with 4 parameters

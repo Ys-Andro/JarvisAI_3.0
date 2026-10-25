@@ -34,7 +34,7 @@ class LiveVoiceBackgroundLifecycleTest {
     class FakeTtsRepository : ITtsRepository {
         private val _isSpeaking = MutableStateFlow(false)
         override val isSpeaking = _isSpeaking.asStateFlow()
-        override suspend fun speak(text: String, pitch: Float, speed: Float) {}
+        override suspend fun speak(text: String, pitch: Float, speed: Float, queueMode: Int) {}
         override suspend fun stop() {
             _isSpeaking.value = false
         }

@@ -83,7 +83,7 @@ class AndroidTtsRepository(
         return hasSpanishChars || hasSpanishWords
     }
 
-    override suspend fun speak(text: String, pitch: Float, speed: Float) {
+    override suspend fun speak(text: String, pitch: Float, speed: Float, queueMode: Int) {
         if (!isInitialized || tts == null) {
             Log.w(TAG, "Cannot speak: TTS not initialized")
             return
@@ -133,7 +133,8 @@ class AndroidTtsRepository(
         }
 
         _isSpeaking.value = true
-        tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+        val mode = if (queueMode == 1) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH
+        tts?.speak(cleanText, mode, null, "${UTTERANCE_ID}_${System.currentTimeMillis()}")
     }
 
     override suspend fun stop() {

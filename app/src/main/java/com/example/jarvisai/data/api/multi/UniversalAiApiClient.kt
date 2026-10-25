@@ -77,6 +77,11 @@ class UniversalAiApiClient(
                     )
                 } else null
 
+                val isComplexOrVision = !imageBase64.isNullOrBlank() || prompt.length > 400 ||
+                    listOf("planifica", "analiza", "codigo", "programacion", "detallada", "investiga", "paso a paso").any { prompt.contains(it, ignoreCase = true) }
+                val thinkingLevel = if (isComplexOrVision) "high" else "low"
+                val thinkingBudget = if (model.id.contains("gemini-2.5-flash") && !isComplexOrVision) 0 else null
+
                 geminiApiClient.streamGenerateContent(
                     apiKey = apiKey,
                     modelName = model.id,
@@ -87,7 +92,9 @@ class UniversalAiApiClient(
                         temperature = settings.temperature,
                         topP = settings.topP,
                         topK = settings.topK,
-                        maxOutputTokens = settings.maxTokens
+                        maxOutputTokens = settings.maxTokens,
+                        thinkingLevel = if (model.id.startsWith("gemini-3")) thinkingLevel else null,
+                        thinkingBudget = thinkingBudget
                     ),
                     inlineData = inlineData
                 )
@@ -187,7 +194,7 @@ class UniversalAiApiClient(
                 requestMethod = "POST"
                 doOutput = true
                 doInput = true
-                connectTimeout = 12000
+                connectTimeout = 8000
                 readTimeout = 60000
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "text/event-stream")
@@ -297,7 +304,7 @@ class UniversalAiApiClient(
                 requestMethod = "POST"
                 doOutput = true
                 doInput = true
-                connectTimeout = 15000
+                connectTimeout = 8000
                 readTimeout = 30000
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "text/event-stream")

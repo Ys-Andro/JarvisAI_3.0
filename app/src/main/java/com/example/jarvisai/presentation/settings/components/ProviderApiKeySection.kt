@@ -77,7 +77,9 @@ data class ProviderMeta(
     val brandColor: Color
 )
 
-val PROVIDERS_META = listOf(
+const val SHOW_ADVANCED_PROVIDERS = false
+
+val ALL_PROVIDERS_META = listOf(
     ProviderMeta(
         id = "gemini",
         name = "Google Gemini",
@@ -135,6 +137,12 @@ val PROVIDERS_META = listOf(
         brandColor = Color(0xFF00B0FF)
     )
 )
+
+val PROVIDERS_META = if (SHOW_ADVANCED_PROVIDERS) {
+    ALL_PROVIDERS_META
+} else {
+    ALL_PROVIDERS_META.filter { it.id in listOf("gemini", "groq", "custom") }
+}
 
 @Composable
 fun ProviderApiKeySection(

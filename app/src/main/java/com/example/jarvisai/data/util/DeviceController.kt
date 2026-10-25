@@ -204,6 +204,31 @@ object DeviceController {
                         "No se encontró el elemento '$text' o el Servicio de Accesibilidad no está activo."
                     }
                 }
+                "CLICK_COORDINATES", "TAP" -> {
+                    val x = json.optDouble("x", 0.0).toFloat()
+                    val y = json.optDouble("y", 0.0).toFloat()
+                    val service = JarvisAccessibilityService.instance
+                    if (service != null) {
+                        service.clickCoordinates(x, y)
+                        "Pulsando en pantalla en coordenadas ($x, $y)..."
+                    } else {
+                        "Active el Servicio de Accesibilidad para interactuar con la pantalla."
+                    }
+                }
+                "SWIPE" -> {
+                    val startX = json.optDouble("startX", 500.0).toFloat()
+                    val startY = json.optDouble("startY", 1200.0).toFloat()
+                    val endX = json.optDouble("endX", 500.0).toFloat()
+                    val endY = json.optDouble("endY", 400.0).toFloat()
+                    val duration = json.optLong("durationMs", 300L)
+                    val service = JarvisAccessibilityService.instance
+                    if (service != null) {
+                        service.swipe(startX, startY, endX, endY, duration)
+                        "Gesto de deslizamiento ejecutado en pantalla."
+                    } else {
+                        "Active el Servicio de Accesibilidad para interactuar con la pantalla."
+                    }
+                }
                 "TYPE_TEXT" -> {
                     val text = json.optString("text", "")
                     val service = JarvisAccessibilityService.instance

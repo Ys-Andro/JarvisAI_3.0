@@ -173,47 +173,154 @@ class JarvisAccessibilityService : AccessibilityService() {
     // UI Search and Text input
     fun clickNodeByText(targetText: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        val list = root.findAccessibilityNodeInfosByText(targetText)
+        val cleanTarget = targetText.trim()
+        if (cleanTarget.isEmpty()) return false
+
+        // 1. Direct system match
+        val list = root.findAccessibilityNodeInfosByText(cleanTarget)
         for (node in list) {
-            if (node.isClickable) {
-                return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                return true
             }
             var parent = node.parent
             while (parent != null) {
-                if (parent.isClickable) {
-                    return parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    return true
                 }
                 parent = parent.parent
             }
+            // Gesture tap fallback using node bounds
+            val rect = android.graphics.Rect()
+            node.getBoundsInScreen(rect)
+            if (rect.width() > 0 && rect.height() > 0) {
+                clickCoordinates(rect.exactCenterX(), rect.exactCenterY())
+                return true
+            }
         }
+
+        // 2. Fuzzy / ContentDescription traversal
+        val foundNode = findNodeFuzzy(root, cleanTarget)
+        if (foundNode != null) {
+            if (foundNode.isClickable && foundNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                return true
+            }
+            var parent = foundNode.parent
+            while (parent != null) {
+                if (parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    return true
+                }
+                parent = parent.parent
+            }
+            val rect = android.graphics.Rect()
+            foundNode.getBoundsInScreen(rect)
+            if (rect.width() > 0 && rect.height() > 0) {
+                clickCoordinates(rect.exactCenterX(), rect.exactCenterY())
+                return true
+            }
+        }
+
         return false
+    }
+
+    private fun findNodeFuzzy(node: AccessibilityNodeInfo, targetText: String): AccessibilityNodeInfo? {
+        val normalizedTarget = targetText.lowercase().trim()
+        val text = node.text?.toString()?.lowercase() ?: ""
+        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+        val hint = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            node.hintText?.toString()?.lowercase() ?: ""
+        } else ""
+
+        if (text.contains(normalizedTarget) || desc.contains(normalizedTarget) || hint.contains(normalizedTarget)) {
+            return node
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findNodeFuzzy(child, targetText)
+            if (found != null) return found
+        }
+        return null
     }
 
     fun typeTextInFocusedField(text: String): Boolean {
         val root = rootInActiveWindow ?: return false
-        val focusedNode = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (focusedNode != null && focusedNode.isEditable) {
+        var targetNode = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+
+        // If no input focused, locate the first editable node
+        if (targetNode == null || !targetNode.isEditable) {
+            targetNode = findFirstEditableNode(root)
+            targetNode?.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+        }
+
+        if (targetNode != null && targetNode.isEditable) {
             val arguments = Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
             }
-            return focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+            return targetNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
         }
         return false
     }
 
+    private fun findFirstEditableNode(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isEditable) return node
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findFirstEditableNode(child)
+            if (found != null) return found
+        }
+        return null
+    }
+
     fun dumpScreenHierarchyText(): String {
-        val root = rootInActiveWindow ?: return "No se pudo leer la pantalla actual."
+        val root = rootInActiveWindow ?: return "No se pudo leer la pantalla actual (ventana activa inaccesible)."
         val sb = StringBuilder()
         traverseAndCollectText(root, sb, 0)
-        return sb.toString().trim()
+        val result = sb.toString().trim()
+        return if (result.isEmpty()) "Pantalla vacía o sin elementos legibles detectados." else result
     }
 
     private fun traverseAndCollectText(node: AccessibilityNodeInfo?, sb: StringBuilder, depth: Int) {
-        if (node == null || depth > 8) return
-        val text = node.text?.toString() ?: node.contentDescription?.toString()
-        if (!text.isNullOrBlank()) {
-            sb.append("- ").append(text.trim()).append("\n")
+        if (node == null || depth > 16) return
+
+        if (node.isPassword) {
+            sb.append("  ".repeat(depth.coerceAtMost(4)))
+                .append("[Campo de contraseña protegido]")
+                .append("\n")
+            return
         }
+
+        val text = node.text?.toString()?.trim()
+        val desc = node.contentDescription?.toString()?.trim()
+        val error = node.error?.toString()?.trim()
+        val hint = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            node.hintText?.toString()?.trim()
+        } else null
+
+        val isButton = node.isClickable || node.className?.contains("Button", ignoreCase = true) == true
+        val isEditable = node.isEditable
+        val isCheckable = node.isCheckable
+
+        val label = when {
+            !text.isNullOrBlank() -> text
+            !desc.isNullOrBlank() -> desc
+            !hint.isNullOrBlank() -> "Pista: $hint"
+            else -> null
+        }
+
+        if (!label.isNullOrBlank() || !error.isNullOrBlank()) {
+            sb.append("  ".repeat(depth.coerceAtMost(4)))
+            when {
+                !error.isNullOrBlank() -> sb.append("[Error: $error] ")
+                isEditable -> sb.append("[Campo editable] ")
+                isButton -> sb.append("[Botón/Clicable] ")
+                isCheckable -> sb.append("[Casilla ${if (node.isChecked) "marcada" else "desmarcada"}] ")
+            }
+            if (!label.isNullOrBlank()) {
+                sb.append(label)
+            }
+            sb.append("\n")
+        }
+
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             traverseAndCollectText(child, sb, depth + 1)

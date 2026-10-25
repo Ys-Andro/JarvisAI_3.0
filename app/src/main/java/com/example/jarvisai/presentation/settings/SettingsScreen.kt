@@ -118,7 +118,7 @@ fun SettingsScreen(
 
     var selectedCategory by remember { mutableStateOf(SettingsCategory.ALL) }
 
-    var isUserProfileExpanded by remember { mutableStateOf(true) }
+    var isUserProfileExpanded by remember { mutableStateOf(false) }
     var isDeviceControlExpanded by remember { mutableStateOf(false) }
     var isApiKeysExpanded by remember { mutableStateOf(false) }
     var isAgentExpanded by remember { mutableStateOf(false) }
