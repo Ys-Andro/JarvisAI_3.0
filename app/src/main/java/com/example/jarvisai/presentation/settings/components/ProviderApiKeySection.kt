@@ -89,6 +89,14 @@ val ALL_PROVIDERS_META = listOf(
         brandColor = Color(0xFF4285F4)
     ),
     ProviderMeta(
+        id = "nvidia",
+        name = "NVIDIA AI (NIM)",
+        badge = "NVIDIA",
+        placeholder = "nvapi-...",
+        hint = "Modelos Nemotron Super, Lightning y Kimi K3 Vision de alta velocidad.",
+        brandColor = Color(0xFF76B900)
+    ),
+    ProviderMeta(
         id = "openrouter",
         name = "OpenRouter",
         badge = "ROUTER",
@@ -141,7 +149,7 @@ val ALL_PROVIDERS_META = listOf(
 val PROVIDERS_META = if (SHOW_ADVANCED_PROVIDERS) {
     ALL_PROVIDERS_META
 } else {
-    ALL_PROVIDERS_META.filter { it.id in listOf("gemini", "groq", "custom") }
+    ALL_PROVIDERS_META.filter { it.id in listOf("gemini", "nvidia", "groq", "custom") }
 }
 
 @Composable

@@ -595,6 +595,7 @@ private fun ChatTopBar(
 
     val brandColor = when (currentModel.provider) {
         com.example.jarvisai.domain.model.ModelProvider.GEMINI -> Color(0xFF4285F4)
+        com.example.jarvisai.domain.model.ModelProvider.NVIDIA -> Color(0xFF76B900)
         com.example.jarvisai.domain.model.ModelProvider.OPENROUTER -> Color(0xFF8B5CF6)
         com.example.jarvisai.domain.model.ModelProvider.OPENAI -> Color(0xFF10A37F)
         com.example.jarvisai.domain.model.ModelProvider.DEEPSEEK -> Color(0xFF0070F3)

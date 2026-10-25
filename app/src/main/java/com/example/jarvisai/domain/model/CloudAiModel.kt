@@ -6,6 +6,7 @@ enum class ModelProvider(
     val defaultEndpoint: String
 ) {
     GEMINI("gemini", "Google Gemini", "https://generativelanguage.googleapis.com/v1beta"),
+    NVIDIA("nvidia", "NVIDIA NIM", "https://integrate.api.nvidia.com/v1"),
     OPENROUTER("openrouter", "OpenRouter", "https://openrouter.ai/api/v1"),
     OPENAI("openai", "OpenAI / ChatGPT", "https://api.openai.com/v1"),
     DEEPSEEK("deepseek", "DeepSeek", "https://api.deepseek.com/v1"),
@@ -24,6 +25,31 @@ data class CloudAiModel(
 ) {
     companion object {
         val ALL_MODELS = listOf(
+            // NVIDIA NIM Models (Nemotron 3 Super, Lightning 30B, Kimi K3 Vision)
+            CloudAiModel(
+                id = "nvidia/nemotron-3-super-120b",
+                provider = ModelProvider.NVIDIA,
+                name = "Nemotron 3 Super 120B (NVIDIA)",
+                description = "Cerebro principal: Razonamiento complejo, planificación, agentes y herramientas",
+                defaultContextLength = 131072,
+                supportsVision = false
+            ),
+            CloudAiModel(
+                id = "nvidia/nemotron-3.5-lightning-30b",
+                provider = ModelProvider.NVIDIA,
+                name = "Nemotron 3.5 Lightning 30B (NVIDIA)",
+                description = "Modelo rápido para conversación cotidiana, comandos y baja latencia",
+                defaultContextLength = 131072,
+                supportsVision = false
+            ),
+            CloudAiModel(
+                id = "meta/llama-3.2-11b-vision-instruct",
+                provider = ModelProvider.NVIDIA,
+                name = "Kimi K3 Vision (NVIDIA)",
+                description = "Análisis visual avanzado, capturas de pantalla e interfaces Android",
+                defaultContextLength = 128000,
+                supportsVision = true
+            ),
             // Google Gemini (Default Model: gemini-3.6-flash)
             CloudAiModel(
                 id = "gemini-3.6-flash",

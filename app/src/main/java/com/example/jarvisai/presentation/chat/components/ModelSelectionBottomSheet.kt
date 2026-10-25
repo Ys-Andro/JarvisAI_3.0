@@ -839,6 +839,7 @@ private fun EmptyModelsState(query: String) {
 
 private fun getProviderColor(provider: ModelProvider): Color = when (provider) {
     ModelProvider.GEMINI -> Color(0xFF4285F4)
+    ModelProvider.NVIDIA -> Color(0xFF76B900)
     ModelProvider.OPENAI -> Color(0xFF10A37F)
     ModelProvider.DEEPSEEK -> Color(0xFF0070F3)
     ModelProvider.GROQ -> Color(0xFFF55036)
@@ -849,6 +850,7 @@ private fun getProviderColor(provider: ModelProvider): Color = when (provider) {
 
 private fun getProviderIcon(provider: ModelProvider): ImageVector = when (provider) {
     ModelProvider.GEMINI -> Icons.Default.AutoAwesome
+    ModelProvider.NVIDIA -> Icons.Default.Memory
     ModelProvider.GROQ -> Icons.Default.Lightbulb
     ModelProvider.DEEPSEEK -> Icons.Default.BubbleChart
     ModelProvider.CUSTOM_OPENAI -> Icons.Default.Code

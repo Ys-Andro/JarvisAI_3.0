@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -79,6 +80,7 @@ import com.example.jarvisai.presentation.models.ModelsViewModel
 import com.example.jarvisai.presentation.settings.components.AgentSelectorSection
 import com.example.jarvisai.presentation.settings.components.GenerationParamsSection
 import com.example.jarvisai.presentation.settings.components.MemoryDocsSection
+import com.example.jarvisai.presentation.settings.components.NvidiaAiSettingsSection
 import com.example.jarvisai.presentation.settings.components.ProviderApiKeySection
 import com.example.jarvisai.presentation.settings.components.SettingsCategory
 import com.example.jarvisai.presentation.settings.components.SettingsCategoryTabs
@@ -121,6 +123,7 @@ fun SettingsScreen(
     var isUserProfileExpanded by remember { mutableStateOf(false) }
     var isDeviceControlExpanded by remember { mutableStateOf(false) }
     var isApiKeysExpanded by remember { mutableStateOf(false) }
+    var isNvidiaExpanded by remember { mutableStateOf(false) }
     var isAgentExpanded by remember { mutableStateOf(false) }
     var isGenParamsExpanded by remember { mutableStateOf(false) }
     var isVoiceExpanded by remember { mutableStateOf(false) }
@@ -330,6 +333,28 @@ fun SettingsScreen(
                                 onSaveCustomEndpoint = { endpoint -> viewModel.updateCustomOpenAiEndpoint(endpoint) },
                                 onSelectModel = { modelId -> viewModel.updateSelectedGeminiModel(modelId) },
                                 onVerifyKey = { provider, key -> viewModel.verifyApiKey(provider, key) }
+                            )
+                        }
+                    }
+                }
+
+                // Section: NVIDIA AI & Nemotron
+                if (selectedCategory == SettingsCategory.ALL || selectedCategory == SettingsCategory.MODELS_API) {
+                    item {
+                        val hasNvidiaKey = !uiState.providerApiKeys["nvidia"].isNullOrBlank()
+                        SettingsSectionCard(
+                            title = "NVIDIA AI & NEMOTRON",
+                            subtitle = "Super 120B, Lightning 30B y Kimi K3 Vision",
+                            icon = Icons.Default.Memory,
+                            badgeText = if (hasNvidiaKey) "ACTIVO" else "CONFIGURAR",
+                            badgeColor = if (hasNvidiaKey) JarvisAccentGreen else JarvisAccentGold,
+                            isExpanded = isNvidiaExpanded,
+                            onToggleExpand = { isNvidiaExpanded = !isNvidiaExpanded }
+                        ) {
+                            NvidiaAiSettingsSection(
+                                uiState = uiState,
+                                onSaveNvidiaApiKey = { key -> viewModel.updateProviderApiKey("nvidia", key) },
+                                onVerifyApiKey = { provider, key -> viewModel.verifyApiKey(provider, key) }
                             )
                         }
                     }
