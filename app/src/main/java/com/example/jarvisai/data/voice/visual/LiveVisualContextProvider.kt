@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.resume
 
@@ -71,6 +73,8 @@ class LiveVisualContextProvider(
         get() = _visualState.value is LiveVisualState.On || _visualState.value is LiveVisualState.Capturing
 
     private var activeMediaProjection: MediaProjection? = null
+    // Avoid concurrent VirtualDisplays and bitmap allocations during rapid requests.
+    private val captureMutex = Mutex()
 
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
@@ -136,7 +140,8 @@ class LiveVisualContextProvider(
         }
     }
 
-    override suspend fun captureFrameBase64(): String? = withContext(Dispatchers.Default) {
+    override suspend fun captureFrameBase64(): String? = captureMutex.withLock {
+        withContext(Dispatchers.Default) {
         val projection = activeMediaProjection
         if (projection == null || !isVisualActive) {
             Log.w(TAG, "Cannot capture frame: Visual context is not active.")
@@ -251,6 +256,7 @@ class LiveVisualContextProvider(
                 _visualState.value = LiveVisualState.On
             }
         }
+         }
     }
 
     override fun release() {
