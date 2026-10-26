@@ -215,17 +215,21 @@ class ChatViewModel(
 
             // Strictly user-controlled visual frame acquisition:
             // Only acquire if visual context was explicitly enabled by user and current model supports multimodal input.
-            val capturedFrame = if (visualContextProvider.isVisualActive && modelSupportsVision) {
-                visualContextProvider.captureFrameBase64()
-            } else if (liveVisionFrameProvider != null && modelSupportsVision) {
-                liveVisionFrameProvider?.invoke()
-            } else {
-                null
-            }
+            // Prefer the explicitly authorized MediaProjection frame. If that source
+            // times out, try the already configured live-frame source before giving up.
+            val capturedFrame = if (modelSupportsVision) {
+                val projectionFrame = if (visualContextProvider.isVisualActive) {
+                    visualContextProvider.captureFrameBase64()
+                } else null
+                projectionFrame ?: liveVisionFrameProvider?.invoke()
+            } else null
 
             val effectivePrompt = when {
                 capturedFrame != null -> {
                     "[MODO LIVE VISION ACTIVO: El usuario te ha compartido una captura de pantalla en tiempo real de su dispositivo. Analiza cuidadosamente los elementos visuales de la pantalla junto con la consulta del usuario]\n$query"
+                }
+                visualContextProvider.isVisualActive && modelSupportsVision && capturedFrame == null -> {
+                    "[Aviso del sistema: La captura de pantalla autorizada no estuvo disponible en esta solicitud. No afirmes haber visto la pantalla; explica brevemente que no se pudo capturar y sugiere volver a intentarlo.]\n$query"
                 }
                 visualContextProvider.isVisualActive && !modelSupportsVision -> {
                     "[Aviso del sistema: El usuario tiene el contexto visual activado para ver su pantalla, pero el modelo activo ($currentModelId) no soporta visión multimodal. Indica brevemente que para responder viendo la pantalla debe cambiar a un modelo compatible con visión como Gemini 3.6 Flash o GPT-4o]\n$query"
